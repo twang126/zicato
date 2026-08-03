@@ -726,6 +726,7 @@ def test_round_seam_is_inert_while_shipped_config_is_disabled() -> None:
         generation_id="v1",
         round_index=0,
         tournament_result=_paired_result(),
+        board=[_Entry("a"), _Entry("b")],
         weights=WEIGHTS,
         decision="rejected",
     )
@@ -741,6 +742,7 @@ def test_round_seam_builds_a_record_when_enabled(monkeypatch: pytest.MonkeyPatch
         generation_id="v1",
         round_index=3,
         tournament_result=_paired_result(),
+        board=[_Entry("a"), _Entry("b")],
         weights=WEIGHTS,
         decision="promoted",
     )
@@ -762,6 +764,7 @@ def test_round_seam_threads_the_gate_verdict(monkeypatch: pytest.MonkeyPatch) ->
         generation_id="v1",
         round_index=0,
         tournament_result=_paired_result(),
+        board=[_Entry("a"), _Entry("b")],
         weights=WEIGHTS,
         decision="rejected",
         scalar=0.42,
@@ -770,6 +773,85 @@ def test_round_seam_threads_the_gate_verdict(monkeypatch: pytest.MonkeyPatch) ->
     assert got is not None
     assert got.candidate.scalar == pytest.approx(0.42)
     assert got.candidate.delta_scalar == pytest.approx(-0.003)
+
+
+class _Entry:
+    """A board entry with only the fields ``split_board`` reads."""
+
+    def __init__(self, entry_id: str) -> None:
+        self.id = entry_id
+        self.tags: tuple[str, ...] = ()
+
+
+def test_round_seam_scores_the_train_slice_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The holdout is confirmation-only. It must not reach the frontier.
+
+    Both sides of a duel run every entry, so ``per_entry_losses`` holds the
+    whole board. The gate filters that down to the train slice. This seam must
+    apply the same filter, or the frontier carries holdout results and a later
+    step leaks them to the proposer.
+
+    The holdout entry here scores far worse than the train entries. If the
+    filter is missing, it drags the recorded drift up and the test fails.
+    """
+    from zicato import orchestrator
+    from zicato.board.split import rotation_seed, split_board
+
+    monkeypatch.setattr(orchestrator, "INTERNAL_PARETO_CONFIG", INTERNAL_DEV_PARETO_CONFIG)
+
+    board = [_Entry(f"e{i}") for i in range(12)]
+    seed = rotation_seed(WEIGHTS.overfitting, "e0")
+    train_ids, holdout_ids = split_board(board, WEIGHTS.overfitting, seed=seed)
+    assert holdout_ids, "this board must actually split, or the test proves nothing"
+
+    per_entry = {
+        entry.id: (
+            _loss(entry.id, drift_loss=1.0, generation_id="v0"),
+            # A holdout entry scores 100. A train entry scores 0.2.
+            _loss(entry.id, drift_loss=100.0 if entry.id in set(holdout_ids) else 0.2),
+        )
+        for entry in board
+    }
+
+    got = orchestrator._pareto_record_for_round(
+        epoch_id="e0",
+        generation_id="v1",
+        round_index=0,
+        tournament_result=_FakeTournamentResult(per_entry),
+        board=board,
+        weights=WEIGHTS,
+        decision="rejected",
+    )
+    assert got is not None
+    # Train-only: every scored entry is 0.2, so the mean is 0.2. Including the
+    # holdout would pull it far above 1.0.
+    assert got.candidate.axes["drift:"] == pytest.approx(0.2)
+
+
+def test_round_seam_uses_the_whole_board_when_it_cannot_split(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A board below ``min_board_size_for_split`` has no holdout."""
+    from zicato import orchestrator
+
+    monkeypatch.setattr(orchestrator, "INTERNAL_PARETO_CONFIG", INTERNAL_DEV_PARETO_CONFIG)
+
+    board = [_Entry("a"), _Entry("b")]
+    per_entry = {
+        "a": (_loss("a", drift_loss=1.0, generation_id="v0"), _loss("a", drift_loss=0.2)),
+        "b": (_loss("b", drift_loss=1.0, generation_id="v0"), _loss("b", drift_loss=0.4)),
+    }
+    got = orchestrator._pareto_record_for_round(
+        epoch_id="e0",
+        generation_id="v1",
+        round_index=0,
+        tournament_result=_FakeTournamentResult(per_entry),
+        board=board,
+        weights=WEIGHTS,
+        decision="rejected",
+    )
+    assert got is not None
+    assert got.candidate.axes["drift:"] == pytest.approx(0.3)
 
 
 def test_round_seam_returns_none_without_paired_losses(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -783,6 +865,7 @@ def test_round_seam_returns_none_without_paired_losses(monkeypatch: pytest.Monke
             generation_id="v1",
             round_index=0,
             tournament_result=_FakeTournamentResult({}),
+            board=[],
             weights=WEIGHTS,
             decision="rejected",
         )
@@ -802,6 +885,7 @@ def test_round_seam_never_raises(monkeypatch: pytest.MonkeyPatch) -> None:
             generation_id="v1",
             round_index=0,
             tournament_result=malformed,
+            board=[_Entry("a")],
             weights=WEIGHTS,
             decision="rejected",
         )

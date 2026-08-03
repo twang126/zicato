@@ -1512,6 +1512,7 @@ async def evolve_once(
         generation_id=next_id,
         round_index=round_index,
         tournament_result=tournament_result,
+        board=board,
         weights=weights,
         decision=bookkeeping_decision,
         scalar=child_scalar,
@@ -1538,12 +1539,33 @@ def _pareto_record_for_round(
     generation_id: str,
     round_index: int,
     tournament_result: Any,
+    board: list[Any],
     weights: ScoringWeights,
     decision: str,
     scalar: float | None = None,
     delta_scalar: float | None = None,
 ) -> ParetoRoundRecord | None:
     """Place the challenger of this round for the Pareto record, or return ``None``.
+
+    The function scores the TRAIN slice only, and it resolves that slice with
+    the same :func:`zicato.board.split.split_board` call that the gate uses.
+    Both sides of a duel run every board entry, and
+    :attr:`TournamentResult.per_entry_losses` holds all of them. The split
+    happens later, when the gate adds the scores up. This function must apply
+    the same filter, for two reasons.
+
+    First, the holdout slice is confirmation-only, and the proposer must never
+    see it. A frontier built on the full board would carry holdout results,
+    and a later step of this work shows the frontier to the proposer. That
+    would defeat the split.
+
+    Second, :attr:`Candidate.scalar` comes from the gate, which measures the
+    train slice. Axes from the full board and a scalar from the train slice
+    would describe different entry sets, and the log line prints them
+    together.
+
+    A board too small to split has no holdout, so the train slice is the whole
+    board and this filter changes nothing.
 
     The function returns ``None`` if there is nothing to record. This occurs
     in two cases. First, recording is off, which is the shipped state. The
@@ -1558,10 +1580,18 @@ def _pareto_record_for_round(
     if not INTERNAL_PARETO_CONFIG.enabled:
         return None
     try:
+        from zicato.board.split import rotation_seed, split_board  # noqa: PLC0415
+
         per_entry = getattr(tournament_result, "per_entry_losses", None) or {}
         if not per_entry:
             return None
-        pairs = list(per_entry.values())
+        train_ids, _holdout_ids = split_board(
+            board, weights.overfitting, seed=rotation_seed(weights.overfitting, epoch_id)
+        )
+        train_set = set(train_ids)
+        pairs = [pair for entry_id, pair in per_entry.items() if entry_id in train_set]
+        if not pairs:
+            return None
         candidate = candidate_from_losses(
             generation_id=generation_id,
             round_index=round_index,

@@ -1,5 +1,45 @@
 # Changelog
 
+### A record-only Pareto frontier alongside the champion (milestone 1)
+
+The promote gate keeps ONE generation — the one whose weighted-sum scalar
+clears `promote_margin`. At the shipped weights (`cost: 0.001` against
+`drift: 1.0`) a challenger can be the cheapest thing the loop ever built
+and move the scalar less than the noise floor, so it is discarded without
+trace. `zicato.tournament.pareto` adds a second, purely OBSERVATIONAL
+record: the non-dominated set across a configured list of namespaces.
+
+Nothing reads it. The frontier is computed after the gate has decided,
+held in memory for one `evolve_n_rounds` invocation, and written only to
+an INFO log line per round. It is keyed by epoch — promotions within an
+epoch leave it standing, since a frozen contract means the raw values
+stay comparable no matter who the champion is, while an epoch roll
+resets it because the board being measured changed.
+
+Deliberately reusing what already exists rather than inventing parallel
+machinery: axes are the `namespace_weights` keys, orientation is the SIGN
+of each weight (so `rubric:`'s negative weight reads as higher-is-better),
+and the "is this difference real?" threshold is `promote_margin` itself —
+already calibrated against a measured A/A noise floor rather than
+guessed. Comparing in scalar points is what lets one margin serve axes
+whose raw units differ by orders of magnitude. There is no new tuning
+knob.
+
+`ParetoConfig` ships DISABLED, with `INTERNAL_PARETO_CONFIG` as the single
+construction site and the one place to change to turn recording on.
+Disabled, the evolve loop is unchanged — one early return per round.
+Candidates are tagged with whether they regressed a
+gate-guarded namespace (`namespace_monotonicity`) but admission does NOT
+enforce it, so one internal run can answer both whether the frontier is
+worth keeping and whether constraining it cuts anything valuable.
+
+Known gaps, all deferred: zero-weight namespaces (`output:`, the most
+interesting axis) cannot be axes at all — zero carries no sign and no
+scale, so they need a per-axis noise floor first; `latency:` has a weight
+but nothing emits it, so the shipped dev axis set is `drift:` + `cost:`,
+which are correlated enough that a thin frontier should be read as
+evidence about the axes rather than about the idea.
+
 ### The holdout confirmation gets its own bounds (issue #118)
 
 `promote_margin` served as both the Rule 1 train threshold and the

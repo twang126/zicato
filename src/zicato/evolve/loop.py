@@ -39,6 +39,7 @@ from zicato.logging_stream import install_log_stream, set_log_context
 from zicato.runtime.heartbeat import HeartbeatBeater
 from zicato.runtime.lock import acquire_workspace_lock, release_workspace_lock
 from zicato.runtime.resume import ResumePlan, prepare_resume
+from zicato.tournament.pareto import FrontierLedger
 from zicato.util import best_effort
 
 if TYPE_CHECKING:
@@ -263,6 +264,49 @@ def _budget_aborted_outcome(parent_generation_id: str, budget_s: int) -> EvolveR
         child_scalar=0.0,
         delta_scalar=0.0,
     )
+
+
+def _record_pareto(ledger: FrontierLedger, outcome: EvolveRoundOutcome) -> None:
+    """Add the Pareto record of one round to ``ledger``. Log the new state.
+
+    The function does no work and writes no log line if the round carried no
+    record. That is the case on every round while recording is off. See
+    :data:`zicato.tournament.pareto.INTERNAL_PARETO_CONFIG`.
+
+    The log line is the product of this milestone. Nothing saves the frontier,
+    so this line is the only way to read the trade-off record of a run. The
+    line stays at level INFO for that reason. The function writes one line for
+    each recorded round.
+
+    The function never raises an exception. It does observational work after a
+    round is complete and in the journal. A fault here must not stop the loop.
+    """
+    record = getattr(outcome, "pareto_record", None)
+    if record is None:
+        return
+    with best_effort(
+        "pareto frontier update",
+        on_error=lambda exc: log.debug("pareto: skipped the frontier update. Cause: %s", exc),
+    ):
+        update = ledger.record(record)
+        frontier = ledger.frontier
+        if update is None or frontier is None:
+            return
+        cand = record.candidate
+        gid = cand.generation_id
+        if update.admitted:
+            detail = f"admitted {gid}"
+            if update.evicted:
+                detail += f" (dominated {', '.join(update.evicted)})"
+        else:
+            detail = f"not admitted {gid} (held off by {update.blocked_by or 'n/a'})"
+        # Add the verdict of the gate for the same challenger. A member that
+        # the scalar refused by a small amount is the interesting case. A
+        # member that the scalar refused by a large amount is not. The log
+        # must show the difference between the two.
+        if cand.delta_scalar is not None:
+            detail += f" [{cand.decision or 'n/a'} Δscalar={cand.delta_scalar:+.4f}]"
+        log.info("pareto: %s — %s", detail, frontier.summary())
 
 
 async def _apply_rubric_replacement(
@@ -620,6 +664,11 @@ async def evolve_n_rounds(
 
     _emitter_token = set_current_emitter(meta_loop_emitter)
     outcomes: list[EvolveRoundOutcome] = []
+    # The Pareto frontier covers the rounds of this loop. It resets on an
+    # epoch roll, and the ledger does that. The ledger belongs to this call,
+    # not to the module. Two loops that run at the same time thus share no
+    # state. The ledger stays empty while recording is off.
+    pareto_ledger = FrontierLedger()
     try:
         await beater.start()
         # The meta-loop session id is surfaced on the heartbeat so the
@@ -804,6 +853,7 @@ async def evolve_n_rounds(
                 stop_reason = "preflight_refused"
                 break
             outcomes.append(outcome)
+            _record_pareto(pareto_ledger, outcome)
             beater.update(
                 epoch_id=epoch_id or "",
                 generation_id=outcome.proposed_generation_id,

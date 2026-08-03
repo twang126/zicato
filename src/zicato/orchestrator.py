@@ -36,6 +36,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeGuard
 
+from zicato.core import ScoringWeights
 from zicato.core.types import (
     Experiment,
     Generation,
@@ -136,6 +137,14 @@ from zicato.runtime.control_consumer import (
 )
 from zicato.runtime.heartbeat import HeartbeatBeater
 from zicato.runtime.resume import ResumePlan
+from zicato.tournament.pareto import (
+    INTERNAL_PARETO_CONFIG,
+    build_round_record,
+    candidate_from_losses,
+)
+from zicato.tournament.pareto import (
+    RoundRecord as ParetoRoundRecord,
+)
 from zicato.util import best_effort
 from zicato.workspace import WorkspaceLayout
 
@@ -202,6 +211,15 @@ class EvolveRoundOutcome:
         ``True`` when the round's loop-health assessment surfaced at
         least one CRITICAL finding (e.g. degenerate scoring producing no
         signal). ``False`` otherwise, including when no assessment ran.
+    pareto_record:
+        The challenger of this round, placed on the multi-objective axes.
+        See :mod:`zicato.tournament.pareto`. The value is ``None`` by
+        default, and on every round while Pareto recording is off. The
+        outcome carries this record because the frontier covers many
+        rounds and ``evolve_once`` runs one round.
+        :func:`zicato.evolve.loop.evolve_n_rounds` owns the ledger and
+        adds the record of each round to it. The record is
+        observational. No caller reads it back into a decision.
     """
 
     parent_generation_id: str
@@ -213,6 +231,7 @@ class EvolveRoundOutcome:
     delta_scalar: float
     health_summary: str = ""
     health_critical: bool = False
+    pareto_record: ParetoRoundRecord | None = None
 
 
 def _declared_custom_judge_names(board: list[Any], weights: Any) -> frozenset[str]:
@@ -1483,6 +1502,22 @@ async def evolve_once(
     )
     round_log.emit("round_closed")
 
+    # --- Pareto record (observational) -----------------------------------
+    # This runs after the gate decides and after the round writes its
+    # journal. It thus cannot change the order or the result of the
+    # promotion path. It is also best-effort: a record that no caller reads
+    # must never fail a round.
+    pareto_record = _pareto_record_for_round(
+        epoch_id=resolved_epoch_id,
+        generation_id=next_id,
+        round_index=round_index,
+        tournament_result=tournament_result,
+        weights=weights,
+        decision=bookkeeping_decision,
+        scalar=child_scalar,
+        delta_scalar=child_scalar - parent_scalar,
+    )
+
     return EvolveRoundOutcome(
         parent_generation_id=parent_id,
         proposed_generation_id=next_id,
@@ -1493,7 +1528,59 @@ async def evolve_once(
         delta_scalar=child_scalar - parent_scalar,
         health_summary=health_summary,
         health_critical=health_critical,
+        pareto_record=pareto_record,
     )
+
+
+def _pareto_record_for_round(
+    *,
+    epoch_id: str,
+    generation_id: str,
+    round_index: int,
+    tournament_result: Any,
+    weights: ScoringWeights,
+    decision: str,
+    scalar: float | None = None,
+    delta_scalar: float | None = None,
+) -> ParetoRoundRecord | None:
+    """Place the challenger of this round for the Pareto record, or return ``None``.
+
+    The function returns ``None`` if there is nothing to record. This occurs
+    in two cases. First, recording is off, which is the shipped state. The
+    early return then keeps a normal round free of extra work. Second, the
+    duel gave no paired losses for each entry.
+
+    The wide ``except`` clause is deliberate. The frontier is observational,
+    and no later step reads it. No fault here is worth the loss of a round
+    that is complete and already in the journal. The function logs the fault
+    and returns ``None``.
+    """
+    if not INTERNAL_PARETO_CONFIG.enabled:
+        return None
+    try:
+        per_entry = getattr(tournament_result, "per_entry_losses", None) or {}
+        if not per_entry:
+            return None
+        pairs = list(per_entry.values())
+        candidate = candidate_from_losses(
+            generation_id=generation_id,
+            round_index=round_index,
+            parent_losses=[parent for parent, _ in pairs],
+            child_losses=[child for _, child in pairs],
+            weights=weights,
+            decision=decision,
+            scalar=scalar,
+            delta_scalar=delta_scalar,
+        )
+        return build_round_record(
+            epoch_id=epoch_id,
+            candidate=candidate,
+            config=INTERNAL_PARETO_CONFIG,
+            weights=weights,
+        )
+    except Exception as exc:  # noqa: BLE001 — observational; never fails a round
+        log.warning("pareto: skipped the candidate for %s. Cause: %s", generation_id, exc)
+        return None
 
 
 # ---------------------------------------------------------------------------

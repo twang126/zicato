@@ -23,11 +23,17 @@ the proposer channel or the dashboard view.
 
 Design notes
 ------------
-**Axes are namespaces, not metric keys.**
-``ScoringWeights.namespace_weights`` uses namespace keys such as ``"drift:"``
-and ``"cost:"``. A namespace axis thus has a weight to read. A metric-key axis
-has no weight. Namespace axes also keep the axis count small. See the note on
-frontier size below.
+**An axis is a namespace key or a metric key.** A namespace key ends with a
+colon, such as ``"cost:"``. A metric key names one metric, such as
+``"cost:tokens_spent"``. Both read their weight from the namespace, because
+every metric in one namespace shares the units of that namespace.
+
+Prefer a metric key when a namespace mixes units. ``cost:`` sums
+``cost:llm_calls`` and ``cost:tokens_spent``, so it adds a count of calls to a
+count of tokens. That sum has no unit, and the two parts can move in opposite
+directions. Note that the scalar path has the same behaviour.
+
+Keep the axis count small either way. See the note on frontier size below.
 
 **The sign of the weight gives the direction.** This module holds no table of
 directions. A positive weight means that a higher value is worse. Drift, cost,
@@ -117,14 +123,24 @@ class ParetoConfig:
         ``False`` is the default. Every entry point then does no work, makes
         no allocation, and leaves the evolve loop unchanged.
     metrics:
-        The namespace prefixes to use as axes. Include the colon, as in
-        ``"drift:"`` and ``"cost:"``. :func:`resolve_axes` drops a namespace
-        that has no weight or a zero weight, and logs a warning. A zero weight
-        has no sign, so it gives no direction. A zero weight also cannot scale
-        a raw value into the scalar points that the margin uses. This rule
-        drops ``output:``, which ships at ``0.0``. ``output:`` is the axis we
-        want most, but we cannot use it yet. It needs a noise floor for each
-        axis, which is separate work.
+        The metric names to use as axes. Each name is one of two forms:
+
+        * a namespace key, which ends with a colon, such as ``"cost:"``. It
+          sums every metric in the namespace, which matches the scalar.
+        * a metric key, such as ``"cost:tokens_spent"``. It measures one
+          thing.
+
+        Prefer a metric key when a namespace mixes units. ``cost:`` adds
+        ``cost:llm_calls`` to ``cost:tokens_spent``, so its sum has no unit.
+
+        Both forms read their weight from the namespace of the name.
+        :func:`resolve_axes` drops a name whose namespace has no weight or a
+        zero weight, and logs a warning. A zero weight has no sign, so it
+        gives no direction. A zero weight also cannot scale a raw value into
+        the scalar points that the margin uses. This rule drops every
+        ``output:`` axis, because that namespace ships at ``0.0``.
+        ``output:chars`` is the axis we want most, but we cannot use it yet.
+        It needs a noise floor for each axis, which is separate work.
     max_frontier_size:
         A guard against a fault. Above this size the frontier drops its oldest
         member and logs a warning. A bounded record is better than an
@@ -142,22 +158,36 @@ INTERNAL_PARETO_CONFIG: ParetoConfig = ParetoConfig(enabled=False)
 #: The first axis set for a recording. Quality against spend is the clearest
 #: trade-off in the metrics that the reducer emits today.
 #:
-#: Remember this caution when you read the first results. Drift and cost
+#: The cost axis is the metric key ``cost:tokens_spent``, not the namespace
+#: ``cost:``. The namespace sums ``cost:llm_calls`` and ``cost:tokens_spent``,
+#: which adds a count of calls to a count of tokens. That sum has no unit, and
+#: the two parts can move in opposite directions. The metric key measures one
+#: thing.
+#:
+#: Remember this caution when you read the first results. Drift and spend
 #: usually move together, because more reasoning is usually both better and
 #: more expensive. Axes that move together give a small frontier. A small
 #: frontier here is thus weak evidence against the idea. It is stronger
-#: evidence that these two axes cannot separate the candidates. To correct
-#: this, add an independent third axis for latency. The reducer must emit
-#: ``latency:`` first.
+#: evidence that these two axes cannot separate the candidates.
+#:
+#: Two changes would add an independent axis. The reducer must emit
+#: ``latency:``, which needs only a mirror of `LossProfile.runtime_ms`. A
+#: custom judge must also emit under ``rubric:`` instead of ``drift:custom``,
+#: which would separate quality from drift.
 INTERNAL_DEV_PARETO_CONFIG: ParetoConfig = ParetoConfig(
     enabled=True,
-    metrics=("drift:", "cost:"),
+    metrics=("drift:", "cost:tokens_spent"),
 )
 
 
 @dataclass(frozen=True, slots=True)
 class Axis:
-    """One resolved objective. It holds a namespace and its signed weight.
+    """One resolved objective. It holds a metric name and its signed weight.
+
+    ``namespace`` holds the name of the axis. The name is either a namespace
+    key such as ``"cost:"``, or a metric key such as ``"cost:tokens_spent"``.
+    Both forms read their weight from the namespace, because every metric in
+    one namespace shares the units of that namespace.
 
     ``weight`` is never zero, because :func:`resolve_axes` drops a zero
     weight. The sign of the weight gives the direction. The size of the weight
@@ -179,30 +209,36 @@ class Axis:
 
 
 def resolve_axes(config: ParetoConfig, weights: ScoringWeights) -> tuple[Axis, ...]:
-    """Change the configured namespaces into axes. Drop the unusable ones.
+    """Change the configured metric names into axes. Drop the unusable ones.
 
-    This function drops a namespace that has no weight or a zero weight. A
-    zero weight has no sign, so it gives no direction. A zero weight also
+    Each name is either a namespace key such as ``"cost:"``, or a metric key
+    such as ``"cost:tokens_spent"``. The function reads the weight from the
+    namespace of the name in both cases.
+
+    This function drops a name whose namespace has no weight or a zero weight.
+    A zero weight has no sign, so it gives no direction. A zero weight also
     scales every candidate to the same point. Such an axis would add nothing
     to dominance, and it would do so without a signal. The function therefore
-    logs each namespace that it drops.
+    logs each name that it drops.
 
     The function returns the axes in the configured order. An empty result is
     correct and means "record nothing". :meth:`Frontier.update` then does no
     work. It does not admit every candidate to a frontier that has no axes.
     """
     axes: list[Axis] = []
-    for namespace in config.metrics:
+    for name in config.metrics:
+        namespace = _namespace_of(name) or name
         weight = float(weights.namespace_weights.get(namespace, 0.0))
         if weight == 0.0:
             log.warning(
-                "pareto: dropped the axis %r. Its namespace weight is %s. Such a "
-                "weight gives no direction and cannot scale into scalar points.",
+                "pareto: dropped the axis %r. The weight of its namespace %r is %s. "
+                "Such a weight gives no direction and cannot scale into scalar points.",
+                name,
                 namespace,
                 "absent" if namespace not in weights.namespace_weights else "0.0",
             )
             continue
-        axes.append(Axis(namespace=namespace, weight=weight))
+        axes.append(Axis(namespace=name, weight=weight))
     return tuple(axes)
 
 
@@ -224,23 +260,39 @@ def _namespace_of(metric_name: str) -> str:
 
 
 def namespace_means(losses: Sequence[LossProfile]) -> dict[str, float]:
-    """Return the mean of each namespace across ``losses``. No weights. Pure.
+    """Return the mean of each metric across ``losses``. No weights. Pure.
 
     This is the unweighted form of
     :func:`zicato.tournament.scoring.aggregate_namespaced_metrics`. It is a
     separate loop, not a change to that function. The scalar path carries the
     promotion decision. This record must not be able to disturb it.
 
-    The rules match that function, but without the multiply by the weight:
+    The result holds TWO levels of granularity, so an axis can be either one:
+
+    * A namespace key, which ends with a colon. Example: ``"cost:"``. The
+      value sums every metric in that namespace, which matches the scalar.
+    * A metric key, which has a name after the colon. Example:
+      ``"cost:tokens_spent"``.
+
+    The two levels never collide, because a namespace key always ends at the
+    colon and a metric key never does.
+
+    A metric key is often the better axis. ``cost:`` sums ``cost:llm_calls``
+    and ``cost:tokens_spent``, which adds a count of calls to a count of
+    tokens. The sum has no unit, and the two parts can move in opposite
+    directions. ``cost:tokens_spent`` measures one thing.
+
+    The rules for each value:
 
     * ``"drift:"`` is the mean of
       :attr:`~zicato.core.LossProfile.drift_loss`. That field is the aggregate
       of the reducer. Do not sum the ``drift:`` MetricCount copies instead,
-      because that counts the drift two times.
-    * For each other namespace, sum the
-      :class:`~zicato.core.MetricCount` values of one run, then take the mean
-      across the runs. A run with no value in a namespace adds zero to the
-      sum. The rest of the aggregation uses the same rule.
+      because that counts the drift two times. The individual ``drift:<kind>``
+      keys still appear, because they measure one kind each.
+    * For each other name, sum the :class:`~zicato.core.MetricCount` values of
+      one run, then take the mean across the runs. A run with no value for a
+      name adds zero to the sum. The rest of the aggregation uses the same
+      rule.
     * The function ignores a metric name that has no namespace.
 
     The function returns ``{}`` for empty input. A candidate with no
@@ -257,14 +309,19 @@ def namespace_means(losses: Sequence[LossProfile]) -> dict[str, float]:
         per_loss: dict[str, float] = {}
         for mc in loss.unified_metrics():
             namespace = _namespace_of(mc.name)
-            if not namespace or namespace == "drift:":
+            if not namespace:
                 continue
-            per_loss[namespace] = per_loss.get(namespace, 0.0) + mc.count
-        for namespace, value in per_loss.items():
-            sums[namespace] = sums.get(namespace, 0.0) + value
+            # The metric key always accumulates. The namespace key skips
+            # drift:, because LossProfile.drift_loss above is the canonical
+            # drift aggregate and a second sum would double-count it.
+            per_loss[mc.name] = per_loss.get(mc.name, 0.0) + mc.count
+            if namespace != "drift:":
+                per_loss[namespace] = per_loss.get(namespace, 0.0) + mc.count
+        for name, value in per_loss.items():
+            sums[name] = sums.get(name, 0.0) + value
 
-    for namespace, total in sums.items():
-        means[namespace] = total / n
+    for name, total in sums.items():
+        means[name] = total / n
     return means
 
 

@@ -70,10 +70,16 @@ def _loss(
 
 
 def _cand(gid: str, drift: float, cost: float, **kw: object) -> Candidate:
+    """A candidate positioned on both the namespace key and the metric key.
+
+    A real candidate carries both levels, so a test fixture must too. The
+    shipped dev config uses ``cost:tokens_spent``; the ``AXES`` constant in
+    this file uses ``cost:``. Both must resolve against this fixture.
+    """
     return Candidate(
         generation_id=gid,
         round_index=int(kw.pop("round_index", 0)),  # type: ignore[call-overload]
-        axes={"drift:": drift, "cost:": cost},
+        axes={"drift:": drift, "cost:": cost, "cost:tokens_spent": cost},
         **kw,  # type: ignore[arg-type]
     )
 
@@ -110,7 +116,7 @@ def test_disabled_config_records_nothing() -> None:
 def test_dev_config_resolves_against_shipped_weights() -> None:
     """The first axis set must resolve. It must not drop without a message."""
     axes = resolve_axes(INTERNAL_DEV_PARETO_CONFIG, WEIGHTS)
-    assert [a.namespace for a in axes] == ["drift:", "cost:"]
+    assert [a.namespace for a in axes] == ["drift:", "cost:tokens_spent"]
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +206,76 @@ def test_namespace_means_sums_within_a_run_then_averages() -> None:
         _loss("b", metric_counts=(MetricCount(name="cost:tokens_spent", count=50.0),)),
     ]
     assert namespace_means(losses)["cost:"] == pytest.approx(100.0)
+
+
+def test_namespace_means_reports_both_namespace_and_metric_keys() -> None:
+    """An axis can be a namespace key or a metric key. Both must be present."""
+    losses = [
+        _loss(
+            "a",
+            metric_counts=(
+                MetricCount(name="cost:tokens_spent", count=100.0),
+                MetricCount(name="cost:llm_calls", count=3.0),
+            ),
+        )
+    ]
+    means = namespace_means(losses)
+    assert means["cost:tokens_spent"] == pytest.approx(100.0)
+    assert means["cost:llm_calls"] == pytest.approx(3.0)
+    # The namespace key still sums the two, which matches the scalar.
+    assert means["cost:"] == pytest.approx(103.0)
+
+
+def test_metric_key_axis_separates_what_the_namespace_conflates() -> None:
+    """``cost:`` adds calls to tokens. ``cost:tokens_spent`` does not.
+
+    Two candidates spend the same tokens but make a different number of calls.
+    The namespace key separates them. The metric key correctly ties them.
+    """
+
+    def at(calls: float, tokens: float) -> dict[str, float]:
+        return namespace_means(
+            [
+                _loss(
+                    "a",
+                    metric_counts=(
+                        MetricCount(name="cost:llm_calls", count=calls),
+                        MetricCount(name="cost:tokens_spent", count=tokens),
+                    ),
+                )
+            ]
+        )
+
+    few = at(2.0, 1000.0)
+    many = at(40.0, 1000.0)
+    assert few["cost:"] != many["cost:"]
+    assert few["cost:tokens_spent"] == many["cost:tokens_spent"]
+
+
+def test_drift_kinds_appear_as_metric_keys_but_do_not_double_count() -> None:
+    """``drift:`` stays the reducer aggregate. The kinds are separate keys."""
+    losses = [
+        _loss(
+            "a",
+            drift_loss=0.5,
+            metric_counts=(MetricCount(name="drift:off_topic", count=2.0),),
+        )
+    ]
+    means = namespace_means(losses)
+    assert means["drift:"] == pytest.approx(0.5)
+    assert means["drift:off_topic"] == pytest.approx(2.0)
+
+
+def test_resolve_axes_accepts_a_metric_key() -> None:
+    """A metric key reads the weight of its namespace."""
+    axes = resolve_axes(ParetoConfig(enabled=True, metrics=("cost:tokens_spent",)), WEIGHTS)
+    assert [a.namespace for a in axes] == ["cost:tokens_spent"]
+    assert axes[0].weight == pytest.approx(WEIGHTS.namespace_weights["cost:"])
+
+
+def test_resolve_axes_drops_a_metric_key_in_a_zero_weight_namespace() -> None:
+    """``output:`` ships at 0.0, so ``output:chars`` is unusable too."""
+    assert resolve_axes(ParetoConfig(enabled=True, metrics=("output:chars",)), WEIGHTS) == ()
 
 
 def test_namespace_means_ignores_unnamespaced_metrics() -> None:
@@ -565,7 +641,7 @@ def test_build_round_record_carries_resolved_terms() -> None:
         weights=WEIGHTS,
     )
     assert rec is not None
-    assert [a.namespace for a in rec.axes] == ["drift:", "cost:"]
+    assert [a.namespace for a in rec.axes] == ["drift:", "cost:tokens_spent"]
     assert rec.margin == pytest.approx(WEIGHTS.promote_margin)
 
 

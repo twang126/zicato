@@ -306,3 +306,24 @@ def test_a_scored_scorer_namespace_reaches_the_proposer_by_its_prefix_only() -> 
     assert "capital of France" not in rendered
     assert "capital of France" not in summary
     assert "size:=4" in summary
+
+
+def test_the_scorer_part_of_a_namespace_with_measured_metrics_is_a_target() -> None:
+    """The proposer sees every part of a term that the scalar scores."""
+    loss = _loss_with("critical_judge", 0.4, 0.89)
+    loss = replace(
+        loss,
+        metric_counts=(*loss.metric_counts, MetricCount(name="size:files", severity="", count=1.0)),
+        metrics={"size:q1_task_text": 4.0},
+    )
+    default = ScoringWeights()
+    weights = ScoringWeights(
+        namespace_weights={**default.namespace_weights, "size:": 1.0},
+        scorer_metric_namespaces=("size:",),
+    )
+    priorities = build_metric_priorities([], weights, [loss])
+    assert {"size:", "size:files"} <= {t.name for t in priorities.namespace_metrics}
+    summary = _render_loss_summary([loss], priorities)
+    assert "size:=4" in summary
+    assert "size:files=1" in summary
+    assert "task_text" not in summary

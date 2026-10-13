@@ -1221,10 +1221,13 @@ Aggregated:
   `pass_fail` only) gets the same arithmetic as a scored one — 1 of 4 replicates
   passing reads `0.25` rather than the single majority bit;
 - `metrics` — per-key mean over the replicates reporting the key, so the
-  decomposition decomposes the folded `score` beside it. A namespace the
-  contract scores from these metrics (`scorer_metric_namespaces`) is meaned
-  over the runs reporting it in `aggregate_namespaced_metrics` too, so the
-  namespace aggregate over the fold equals the aggregate over the replicates;
+  decomposition decomposes the folded `score` beside it. A namespaced key is
+  meaned over the replicates that report its namespace, with a missing key
+  read as zero, because a scorer can choose different names in different
+  replicates. The namespace total of one folded entry is then the mean of the
+  reporting replicates' totals. That is the rule that
+  `aggregate_namespaced_metrics` uses for a namespace that the contract scores
+  from these metrics (`scorer_metric_namespaces`);
 - `metric_counts` (and the `tokens_spent` / `output_chars` / `schema_failures`
   scalars) — namespace-bearing via `aggregate_namespaced_metrics`, whose
   per-namespace values are summed into the scalar for any contract with a

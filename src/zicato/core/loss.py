@@ -422,19 +422,31 @@ class LossProfile:
                 continue
             out.append(mc)
             seen_names.add(mc.name)
-        # A scorer metric reaches the scalar only when the contract lists its
-        # namespace. The contract loader refuses the reserved namespaces, so
-        # a scorer cannot replace a measured channel.
+        out.extend(self.scorer_metric_counts(scorer_namespaces, taken=seen_names))
+        return tuple(out)
+
+    def scorer_metric_counts(
+        self, scorer_namespaces: Collection[str], *, taken: Collection[str] = ()
+    ) -> tuple[MetricCount, ...]:
+        """The scorer metrics in the namespaces that ``scorer_namespaces`` lists.
+
+        A scorer metric reaches the scalar only when the contract lists its
+        namespace. The contract loader refuses the reserved namespaces, so a
+        scorer cannot replace a measured channel. A name in ``taken`` (the
+        measured and derived channels) keeps its measured value.
+        """
         if not scorer_namespaces:
-            return tuple(out)
+            return ()
+        if not taken:
+            taken = {mc.name for mc in self.metric_counts}
+        out: list[MetricCount] = []
         for name, value in sorted((self.metrics or {}).items()):
             namespace, sep, _ = name.partition(":")
             if not sep or f"{namespace}:" not in scorer_namespaces:
                 continue
-            if name in seen_names or not math.isfinite(value):
+            if name in taken or not math.isfinite(value):
                 continue
             out.append(MetricCount(name=name, severity="", count=float(value)))
-            seen_names.add(name)
         return tuple(out)
 
 

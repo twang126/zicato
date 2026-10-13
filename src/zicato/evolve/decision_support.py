@@ -585,14 +585,12 @@ def _metric_values(loss: Any, scorer_namespaces: tuple[str, ...] = ()) -> dict[s
     namespace may reach the proposer (G8, 05-proposer.md §5.8.1).
     """
     values = {mc.name: mc.count for mc in loss.scoring_metrics()}
+    scorer_metrics = loss.scorer_metric_counts(scorer_namespaces) if scorer_namespaces else ()
     for namespace in scorer_namespaces:
-        scored = [
-            float(value)
-            for name, value in (getattr(loss, "metrics", None) or {}).items()
-            if name.startswith(namespace) and math.isfinite(value)
-        ]
+        scored = [mc.count for mc in scorer_metrics if mc.name.startswith(namespace)]
         if scored:
-            values.setdefault(namespace, math.fsum(scored))
+            # A measured metric named by the bare prefix shares the target.
+            values[namespace] = values.get(namespace, 0.0) + math.fsum(scored)
     return values
 
 
@@ -698,7 +696,11 @@ def build_metric_priorities(board: list[Any], weights: Any, losses: list[Any]) -
         if namespace in ("drift:", "judge:") or not float(weight):
             continue
         names = sorted(name for name in observed if name.startswith(namespace))
-        for name in names or [namespace]:
+        # A listed namespace can also hold measured metrics; its scorer part
+        # is a target of its own, under the prefix.
+        if not names or (namespace in scorer_namespaces and namespace not in names):
+            names.append(namespace)
+        for name in names:
             namespace_metrics.append(ScoredTarget(name, float(weight)))
 
     return MetricPriorities(

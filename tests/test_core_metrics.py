@@ -213,11 +213,7 @@ def test_the_replicate_fold_averages_a_scored_metric_over_the_replicates_that_re
 
 
 def test_a_scored_namespace_is_meaned_over_the_entries_that_report_it() -> None:
-    """A silent entry cannot pull a lower-is-better scorer term toward zero.
-
-    The fold of one entry's replicates and the aggregate over entries use the
-    same rule, so the two views of one duel agree.
-    """
+    """A silent entry cannot pull a lower-is-better scorer term toward zero."""
     from zicato.tournament.scoring import average_replicate_losses
 
     weights = _weights_scoring("size:")
@@ -232,6 +228,54 @@ def test_a_scored_namespace_is_meaned_over_the_entries_that_report_it() -> None:
     )
     assert aggregate_namespaced_metrics([cost, silent], weights)["cost:"] == pytest.approx(
         weights.namespace_weights["cost:"] * 2.0
+    )
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "expected"),
+    [
+        # The scorer chose a different name in each replicate.
+        ({"size:x.txt": 10.0}, {"size:y.txt": 10.0}, 10.0),
+        # One replicate did not report one of its names.
+        ({"size:a": 4.0, "size:b": 2.0}, {"size:a": 4.0}, 5.0),
+    ],
+)
+def test_the_fold_of_one_entry_gives_the_mean_of_its_replicate_totals(
+    first: dict[str, float], second: dict[str, float], expected: float
+) -> None:
+    """The gate reads the fold, so the fold must not change a namespace total."""
+    from zicato.tournament.scoring import average_replicate_losses
+
+    weights = _weights_scoring("size:")
+    runs = [_bare_profile(metrics=first), _bare_profile(metrics=second)]
+    assert aggregate_namespaced_metrics(runs, weights)["size:"] == pytest.approx(expected)
+    folded = average_replicate_losses([{"e1": runs[0]}, {"e1": runs[1]}])["e1"]
+    assert aggregate_namespaced_metrics([folded], weights)["size:"] == pytest.approx(expected)
+
+
+def test_a_scored_namespace_that_no_run_reports_has_no_aggregate() -> None:
+    """Not measured is not zero: the gate and the Pareto frontier skip the namespace."""
+    weights = _weights_scoring("size:")
+    silent = _bare_profile(metrics=None)
+    aggregates = aggregate_namespaced_metrics([silent, silent], weights)
+    assert "size:" not in aggregates
+    assert aggregates["cost:"] == 0.0
+
+
+def test_a_measured_metric_in_a_scored_namespace_keeps_its_divisor() -> None:
+    """Only the scorer part of a listed namespace skips the silent runs."""
+    weights = _weights_scoring("size:")
+    measured = _bare_profile(
+        metric_counts=(MetricCount(name="size:files", severity="", count=4.0),)
+    )
+    silent = _bare_profile(metrics=None)
+    assert aggregate_namespaced_metrics([measured, silent], weights)["size:"] == pytest.approx(2.0)
+    scored = _bare_profile(
+        metric_counts=(MetricCount(name="size:files", severity="", count=4.0),),
+        metrics={"size:words": 6.0},
+    )
+    assert aggregate_namespaced_metrics([scored, silent], weights)["size:"] == pytest.approx(
+        2.0 + 6.0
     )
 
 

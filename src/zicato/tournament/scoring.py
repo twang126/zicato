@@ -73,6 +73,7 @@ from __future__ import annotations
 import json
 import math
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -497,23 +498,18 @@ def aggregate_namespaced_metrics(
     # rather than accumulated in a running float, so the aggregate does not
     # depend on the order the losses arrive in.
     terms: dict[str, list[float]] = {}
+    # The scorer metrics of a listed namespace are kept apart from the
+    # measured terms, because the two use different divisors (below).
+    scorer_terms: dict[str, list[float]] = {}
     n_losses = len(losses)
     for loss in losses:
         # Sum within one loss first so a loss with multiple entries in
         # the same namespace counts each entry, and a loss with none
         # contributes zero.
-        per_loss: dict[str, list[float]] = {}
-        for mc in loss.scoring_metrics(weights.scorer_metric_namespaces):
-            ns = _namespace_of(mc.name)
-            if not ns or ns == "drift:":
-                # Drift is already reduced into ``drift_loss`` above; its
-                # MetricCount mirrors — including the ``drift:custom``
-                # judge-attributed ones the judge: channel scores — are
-                # skipped here so nothing is counted twice.
-                continue
-            per_loss.setdefault(ns, []).append(mc.count * _within_channel_weight(mc.name, weights))
-        for ns, values in per_loss.items():
-            terms.setdefault(ns, []).append(math.fsum(values))
+        _add_run_totals(terms, loss.scoring_metrics(), weights)
+        _add_run_totals(
+            scorer_terms, loss.scorer_metric_counts(weights.scorer_metric_namespaces), weights
+        )
     sums: dict[str, float] = {ns: math.fsum(values) for ns, values in terms.items()}
 
     # Promote known-but-absent namespaces to zero aggregates so
@@ -522,21 +518,41 @@ def aggregate_namespaced_metrics(
     for ns in observed_namespaces:
         if ns == "drift:":
             continue
-        # A namespace the contract opts into from the scorer's own metrics
-        # follows the metrics rule "not measured is not zero": it is meaned
-        # over the runs that report it, as the replicate fold means it over
-        # the replicates that report it. An aborted or silent run then
-        # cannot pull a lower-is-better scorer term toward zero; it pays
-        # through the failure: channel instead.
+        mean_val = sums.get(ns, 0.0) / n_losses if n_losses > 0 else 0.0
+        # The scorer metrics of a listed namespace follow the metrics rule
+        # "not measured is not zero": their run totals are meaned over the
+        # runs that report the namespace, so a silent run cannot pull a
+        # lower-is-better scorer term toward zero. When no run reports it
+        # and no measured term fills it, the namespace has no aggregate: the
+        # gate and the Pareto frontier skip it, and the scalar adds nothing.
         if ns in weights.scorer_metric_namespaces:
-            reporting = len(terms.get(ns, ()))
-            mean_val = sums.get(ns, 0.0) / reporting if reporting else 0.0
-        else:
-            mean_val = sums.get(ns, 0.0) / n_losses if n_losses > 0 else 0.0
+            reported = scorer_terms.get(ns, [])
+            if not reported and ns not in sums:
+                continue
+            if reported:
+                mean_val += math.fsum(reported) / len(reported)
         ns_weight = weights.namespace_weights.get(ns, 0.0)
         namespace_means[ns] = ns_weight * mean_val
 
     return namespace_means
+
+
+def _add_run_totals(
+    totals: dict[str, list[float]], metrics: Iterable[MetricCount], weights: ScoringWeights
+) -> None:
+    """Append one run's weighted total per namespace of ``metrics`` to ``totals``."""
+    per_run: dict[str, list[float]] = {}
+    for mc in metrics:
+        ns = _namespace_of(mc.name)
+        if not ns or ns == "drift:":
+            # Drift is already reduced into ``drift_loss`` above; its
+            # MetricCount mirrors — including the ``drift:custom``
+            # judge-attributed ones the judge: channel scores — are
+            # skipped here so nothing is counted twice.
+            continue
+        per_run.setdefault(ns, []).append(mc.count * _within_channel_weight(mc.name, weights))
+    for ns, values in per_run.items():
+        totals.setdefault(ns, []).append(math.fsum(values))
 
 
 def _per_judge_loss_aggregate(losses: list[LossProfile]) -> dict[str, float]:
@@ -827,7 +843,12 @@ def _mean_metrics(profiles: list[LossProfile]) -> dict[str, float] | None:
     Each key is meaned over the replicates that REPORT it (the
     "not measured is not zero" model of :func:`_mean_over_present`) —
     a scorer that emitted ``precision`` on three of four replicates
-    reports the mean of those three. Returns ``None`` when no replicate
+    reports the mean of those three. A namespaced key (``size:x``) is
+    meaned over the replicates that report its NAMESPACE, with a missing
+    key read as zero. The scorer can choose different names in different
+    replicates, and this rule keeps each namespace total of the fold equal
+    to the mean of the reporting replicates' totals, which is the value
+    :func:`aggregate_namespaced_metrics` gives one run. Returns ``None`` when no replicate
     carried a decomposition, so a board whose scorers expose none folds
     byte-identically to the pre-replication path.
 
@@ -845,9 +866,16 @@ def _mean_metrics(profiles: list[LossProfile]) -> dict[str, float] | None:
                 keys.append(key)
     if not keys:
         return None
+    reported_namespaces = [{_namespace_of(key) for key in p.metrics or {}} for p in profiles]
     folded: dict[str, float] = {}
     for key in keys:
-        mean = _mean_over_present([(p.metrics or {}).get(key) for p in profiles])
+        ns = _namespace_of(key)
+        mean = _mean_over_present(
+            [
+                (p.metrics or {}).get(key, 0.0 if ns and ns in reported else None)
+                for p, reported in zip(profiles, reported_namespaces, strict=True)
+            ]
+        )
         if mean is not None:
             folded[key] = mean
     return folded

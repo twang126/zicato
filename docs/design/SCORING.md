@@ -392,15 +392,20 @@ contract lists in `scorer_metric_namespaces` (default empty), at the
 monotonicity guard. The namespaces that the reducer or a derived channel
 fills are refused in that list, and a listed namespace needs a
 `namespace_weights` entry. The list is a set: order and repeats do not change
-the contract hash. A listed namespace follows the metrics rule "not measured
-is not zero" at both levels: the replicate fold means a scorer metric over
-the replicates that report it, and the scalar means the namespace over the
-runs that report it. An aborted or silent run therefore cannot pull a
-lower-is-better scorer term toward zero; it pays through the `failure:`
-channel instead. The proposer sees a listed namespace by its prefix and its
-per-run total only, never the scorer's own metric names, because a scorer
-chooses those names at run time and one can carry an entry id or task text
-(G8).
+the contract hash. The scorer part of a listed namespace follows the metrics
+rule "not measured is not zero" at both levels: the replicate fold and the
+scalar mean its totals over the replicates and the runs that report the
+namespace. A silent run therefore cannot pull a lower-is-better scorer term
+toward zero, and an aborted run pays through the `failure:` channel. A
+measured metric in the same namespace keeps the usual divisor. When no run
+reports the namespace and no measured metric fills it, the namespace has no
+aggregate: the gate and the Pareto frontier skip it, and the scalar adds no
+term. A side whose scorer is silent on a listed namespace therefore pays
+nothing for it, so a scorer must report each listed namespace on every run
+that completes. The proposer sees the scorer part of a listed namespace by
+its prefix and its per-run total only, never the scorer's own metric names,
+because a scorer chooses those names at run time and one can carry an entry
+id or task text (G8).
 
 The namespace sum is **sorted**. Float addition is not associative, and
 the namespace key set is assembled from a `set`, so an unsorted sum

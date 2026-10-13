@@ -1213,12 +1213,13 @@ and `promote_margin` otherwise. The pass-rate check on the holdout tolerates up
 to `holdout_entry_regression_budget` regressed entries. Incomplete holdout
 execution or a non-finite holdout number is also `holdout_not_confirmed`.
 
-The asymmetry is intentional: the holdout is never asked to clear the margin in
-the *improving* direction, so a train-measured win that merely holds flat on the
+The asymmetry is intentional: by default the holdout is never asked to clear the
+margin in the *improving* direction, so a train-measured win that merely holds flat on the
 holdout counts as a confirmation rather than a failure. This is what makes the
 holdout a guard against board-memorization rather than a second, stricter
-promotion bar. A failed confirmation is just another `reject` (reason
-`holdout_not_confirmed`); the champion stands, and the incumbent stays protected
+promotion bar. A contract that sets `holdout_confirmation: "improve"` opts in
+to that second bar (04-evaluation-statistics.md §5.3). A failed confirmation is
+just another `reject` (reason `holdout_not_confirmed`); the champion stands, and the incumbent stays protected
 in the sense that only a gate promotion can displace it. Passing `None` for both holdout arguments (a small board,
 or the split disabled) skips the step entirely, leaving the three train rungs as
 the whole decision. See 04-evaluation-statistics.md §5 for the split mechanics

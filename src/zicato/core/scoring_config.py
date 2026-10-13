@@ -24,6 +24,11 @@ from zicato.core.tournament import (
     experimental_structure_refusal,
 )
 
+#: How the holdout confirms a train-measured win (:attr:`ScoringWeights.holdout_confirmation`).
+#: ``"no_regression"``: the challenger must not regress on the holdout.
+#: ``"improve"``: the challenger must also improve on it.
+HoldoutConfirmation = Literal["no_regression", "improve"]
+
 # ---------------------------------------------------------------------------
 # Telemetry dialects (TELEMETRY-DIALECTS.md)
 # ---------------------------------------------------------------------------
@@ -610,8 +615,8 @@ class ScoringWeights:
         confirmation rejects. ``0`` (default) is zero tolerance: any
         regressing holdout entry blocks confirmation.
 
-        The holdout confirms rather than re-decides: a train-measured win
-        must merely not regress there. The pass-rate monotonicity rule the
+        By default the holdout confirms rather than re-decides: a
+        train-measured win must merely not regress there. The pass-rate monotonicity rule the
         confirmation reuses carries only a float-noise tolerance (``1e-9``
         aggregate, ``0.02`` per entry). On a six-entry noisy slice a single
         entry flipping from pass to fail therefore rejects at every margin,
@@ -624,6 +629,38 @@ class ScoringWeights:
         would produce on that slice. Holdout-only: the train side keeps
         zero tolerance, so this cannot loosen the gate's primary decision.
         Must be ``>= 0``.
+    holdout_confirmation:
+        What the holdout must show before a train-measured win is promoted
+        (:data:`HoldoutConfirmation`). ``"no_regression"`` (default) is the
+        guard described above: the challenger must not regress on the
+        holdout. ``"improve"`` also requires the challenger's holdout loss
+        to fall by more than ``max(holdout_min_gain, holdout_min_gain_ratio
+        × train loss drop)``, so a change that wins on train and is flat on
+        the holdout is rejected. The holdout then becomes a second
+        promotion bar. On a noisy board it rejects many challengers that
+        have no real effect, and it also rejects some real wins that the
+        small holdout slice cannot show.
+    holdout_min_gain:
+        The holdout loss drop that an ``"improve"`` confirmation requires,
+        in scalar units. ``0.0`` (default) accepts any strict improvement.
+        It has no effect under ``"no_regression"``. Must be ``>= 0``.
+    holdout_min_gain_ratio:
+        Scales the ``"improve"`` bar with the train gain: the holdout loss
+        must fall by more than this ratio times the train loss drop, and by
+        more than :attr:`holdout_min_gain`. A train win that is much larger
+        than its holdout gain is usually a fit to the train slice. This
+        setting rejects such a win, and a modest general win still passes.
+        ``0.0`` (default) keeps the fixed bar alone. It has no effect under
+        ``"no_regression"``. Must be in ``[0, 1]``: above ``1``, the coarser
+        holdout slice would have to beat the train gain itself.
+
+        The train gain is the crowned challenger's measured loss drop. When
+        several challengers compete in one round (racing, best-of-N), that
+        value is the largest of several noisy measurements. It is biased
+        upward, so the effective bar is stricter than the ratio states. Use
+        a lower ratio there than with a single challenger. On a small
+        holdout, compare the bar with the step size of the slice, which
+        ``zicato board preflight`` reports.
     pass_rate_monotonicity:
         When on (default), a pass-rate regression rejects the challenger
         whatever the drift-side improvement: every expectation the
@@ -786,8 +823,8 @@ class ScoringWeights:
         default=0.01,
         metadata=_knob(constraint=KnobConstraint(minimum=0)),
     )
-    # The holdout confirmation's own bounds. Both are inert at their default
-    # and omitted from the canonical form there, so no contract hash moves.
+    # The holdout confirmation's own bounds and its opt-in "improve" bar. Each
+    # is inert at its default, and each enters the canonical form (G6).
     holdout_margin: float | None = field(
         default=None,
         metadata=_knob(
@@ -797,6 +834,18 @@ class ScoringWeights:
     holdout_entry_regression_budget: int = field(
         default=0,
         metadata=_knob(constraint=KnobConstraint(minimum=0)),
+    )
+    holdout_confirmation: HoldoutConfirmation = field(
+        default="no_regression",
+        metadata=_knob(constraint=KnobConstraint(choices=get_args(HoldoutConfirmation))),
+    )
+    holdout_min_gain: float = field(
+        default=0.0,
+        metadata=_knob(constraint=KnobConstraint(minimum=0)),
+    )
+    holdout_min_gain_ratio: float = field(
+        default=0.0,
+        metadata=_knob(constraint=KnobConstraint(minimum=0, maximum=1)),
     )
     pass_rate_monotonicity: bool = field(
         default=True,

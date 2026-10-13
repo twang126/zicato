@@ -180,7 +180,8 @@ adds entries only to elevate or demote specific drift kinds.
 
 The example shows the fields this document covers. A complete
 `scoring.json` also carries the holdout-confirmation bounds
-(`holdout_margin`, `holdout_entry_regression_budget`), the regression-suite
+(`holdout_margin`, `holdout_entry_regression_budget`, `holdout_confirmation`,
+`holdout_min_gain`, `holdout_min_gain_ratio`), the regression-suite
 gate (`regression_gate_enabled`, `regression_test_command`,
 `regression_timeout_s`), `namespace_monotonicity`, the `tournament` block,
 and the `overfitting`, `proposer_quality`, and `experimental` blocks, plus
@@ -581,6 +582,25 @@ the holdout is the smaller slice and its scalar moves in coarser steps:
   regress under the pass-rate rule before confirmation fails. `0` (the
   default) tolerates none. Under `aggregate` scope the budget widens the
   mean-score tolerance by the movement that many entries produce.
+
+A contract can also make the holdout a second promotion bar:
+
+- `holdout_confirmation` — `"no_regression"` (the default) is the rule
+  above. `"improve"` also requires the challenger's holdout loss to fall by
+  more than `max(holdout_min_gain, holdout_min_gain_ratio × train loss drop)`.
+  This check comes after the regression checks, so a regression still reports
+  as a regression.
+- `holdout_min_gain` — the fixed part of that bar, in scalar units. `0.0`
+  (the default) accepts any strict improvement.
+- `holdout_min_gain_ratio` — the part of that bar that scales with the
+  train gain, in `[0, 1]`. A train win that is much larger than its holdout
+  gain is usually a fit to the train slice. With `0.5`, a train gain of
+  `0.18` needs a holdout gain of more than `0.09`. When several challengers
+  compete in one round, the crowned challenger's train gain is biased upward,
+  so use a lower ratio there. `zicato board preflight` reports the holdout
+  step size to compare the bar with.
+
+The reason of a failed `"improve"` confirmation names the bar that fired.
 
 A failed confirmation rejects with a reason that begins
 `"holdout_not_confirmed: "`.

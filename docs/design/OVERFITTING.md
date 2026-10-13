@@ -707,7 +707,10 @@ margin can satisfy would be a second gate rather than a confirmation. The
 TRAIN side keeps its zero-tolerance rule. For commensurable bounds set
 `holdout_margin ≈ promote_margin × N_train / N_holdout`;
 `preflight.holdout_window_note` says so on the pre-flight record when
-either bound looks infeasible.
+either bound looks infeasible. A contract can opt in to a holdout that must
+improve with `holdout_confirmation: "improve"`. The holdout loss must then
+fall by more than `max(holdout_min_gain, holdout_min_gain_ratio × train
+gain)`, so a train win that is much larger than its holdout gain is rejected.
 
 **#2 — Ladder-mediated, budgeted holdout feedback. (SHIPPED.)**
 *What:* mediate every holdout query through a Ladder rule. A holdout-based

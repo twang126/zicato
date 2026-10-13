@@ -873,7 +873,7 @@ The holdout confirmation itself (`_holdout_confirms` in
   regression beyond `holdout_entry_regression_budget` entries under the SAME
   `pass_rate_monotonicity_scope` the train slice uses (one consistent policy —
   per-entry on both sides, or aggregate on both);
-- it is **never** asked to clear a margin in the *improving* direction. A train-measured win that merely holds flat on the holdout counts
+- by default it is **never** asked to clear a margin in the *improving* direction. A train-measured win that merely holds flat on the holdout counts
   as a confirmation rather than a failure.
 
 This asymmetry is what makes the holdout a guard against *board
@@ -882,6 +882,16 @@ it into requiring holdout improvement, you halve the loop's power for zero
 soundness gain. The holdout slice is small and its per-round measurement is
 noisier than the train slice, so demanding improvement on it demands a signal
 the slice cannot statistically deliver.
+
+A contract can still opt in to that second bar with `holdout_confirmation:
+"improve"`, and it accepts the cost above. The holdout loss must then fall by
+more than `max(holdout_min_gain, holdout_min_gain_ratio × train_gain)`, where
+`train_gain` is the champion's train scalar minus the challenger's. Both
+callers pass it: `evaluate_gate` and the Ladder path in
+`governance._ladder_mediated_outcome`. `holdout_confirms` requires it as a
+keyword, so no caller can drop the scaled bar. The scaled bar targets a train
+win that is much larger than its holdout gain, which is usually a fit to the
+train slice.
 
 ### 5.4 State, persistence, and the record shape
 
@@ -1609,7 +1619,7 @@ are the same number, and float rounding closes even that single point. Past the
 scalar bound, the holdout's pass-rate rule — carrying only its float-noise
 tolerance and no operator knob at all — rejects at every margin anyway.
 
-Two default-inert `ScoringWeights` contract fields split the bounds off. Like
+Default-inert `ScoringWeights` contract fields split the bounds off. Like
 every contract field, their effective values, defaults included, are part of
 the contract hash:
 
@@ -1617,6 +1627,9 @@ the contract hash:
 |---|---|---|
 | `holdout_margin` | `None` | The holdout confirmation's scalar tolerance (`gate.effective_holdout_margin`). `None` ⇒ fall back to `promote_margin`. Scoped to the confirmation only — it does not move the Ladder's release threshold, which gates a *train*-measured improvement. |
 | `holdout_entry_regression_budget` | `0` | How many holdout entries may regress before the confirmation rejects. `0` ⇒ a zero-tolerance rule. Applies under both monotonicity scopes — per-entry as a count, aggregate as a widened `budget / entries` band, so one budget unit means one entry either way. |
+| `holdout_confirmation` | `"no_regression"` | `"improve"` makes the holdout a second bar (§5.3): the holdout loss must also fall by more than `max(holdout_min_gain, holdout_min_gain_ratio × train_gain)`. |
+| `holdout_min_gain` | `0.0` | The fixed part of the `"improve"` bar, in scalar units. Must be `>= 0`. No effect under `"no_regression"`. |
+| `holdout_min_gain_ratio` | `0.0` | The part of the `"improve"` bar that scales with the train gain. Must be in `[0, 1]`. The crowned challenger's train gain is biased upward when several challengers compete, so the effective bar is stricter there. `holdout_window_note` reports the train gain above which more than one holdout entry must improve. No effect under `"no_regression"`. |
 
 For commensurable bounds set `holdout_margin ≈ promote_margin × N_train /
 N_holdout`, roughly double on the default split. The budget follows the gate's
@@ -1629,10 +1642,12 @@ decision.
 `preflight.holdout_window_note` renders the feasibility note — prose on the
 pre-flight record (`holdout_note`) and printed by `zicato board preflight`.
 The note is advisory and cannot refuse execution. It names
-both facts an operator cannot otherwise see without doing the arithmetic: that
+the facts an operator cannot otherwise see without doing the arithmetic: that
 one entry flipping moves the holdout scalar by about `pass_weight / N`, and
 that at budget `0` a single flip rejects at **every** margin, which raising the
-holdout margin cannot fix.
+holdout margin cannot fix. With `holdout_confirmation: "improve"` and a
+`holdout_min_gain_ratio` above 0, it also names the train gain above which
+more than one holdout entry must improve.
 
 ### 9.4 The floor statistic a recommendation may scale
 

@@ -192,8 +192,9 @@ Two more checks sit *after* those four rules:
   `holdout`-tagged entry, or a hash split once the board reaches
   `min_board_size_for_split`, default 6 entries), a win the train slice
   measured must also not regress on the holdout, or it flips to
-  `holdout_not_confirmed`. The holdout is never asked to clear
+  `holdout_not_confirmed`. By default the holdout is never asked to clear
   `promote_margin` in the improving direction — merely holding flat confirms.
+  `holdout_confirmation: "improve"` changes this (see the holdout table below).
 - When the `tournament` params set `promote_confidence_threshold` (the
   recommended contract sets `0.8`), the evidence gate must confirm a crowning
   promotion: it spends up to `promote_confidence_replicates` extra draws of
@@ -352,6 +353,15 @@ contract hash:
 
 The TRAIN side keeps its zero-tolerance rule either way, so neither knob
 loosens the gate's primary decision.
+
+With `holdout_confirmation: "improve"`, the holdout is a second bar: its loss
+must fall by more than `max(holdout_min_gain, holdout_min_gain_ratio × train
+loss drop)`.
+
+| Field | Default | Set it when |
+|---|---|---|
+| `holdout_min_gain` | `0.0` | a holdout gain must clear a fixed size before a promotion. |
+| `holdout_min_gain_ratio` | `0.0` (off; in `[0, 1]`) | candidates win large on train and little on the holdout, which is usually a fit to the train slice. `0.5` asks for a holdout gain of more than half the train gain. With several challengers per round (racing, best-of-N), the crowned challenger's train gain is biased upward, so use a lower ratio there. `zicato board preflight` prints the holdout step size to compare it with. |
 
 ## Calibration workflow
 

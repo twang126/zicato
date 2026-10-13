@@ -626,14 +626,16 @@ def _holdout_confirms(
     holdout_parent_agg: dict[str, Any],
     holdout_child_agg: dict[str, Any],
     weights: ScoringWeights,
+    *,
+    train_gain: float,
 ) -> str:
     """Return ``""`` when the holdout confirms the win, else a reason.
 
     Reuses the same machinery the train slice is gated by — a scalar
     regression band on the holdout scalar, and the pass-rate monotonicity
-    check on the holdout's per-entry rows — but in *confirmation* form: the
-    challenger must merely *not regress* on the holdout. Concretely it
-    rejects when
+    check on the holdout's per-entry rows — but in *confirmation* form: by
+    default the challenger must merely *not regress* on the holdout.
+    Concretely it rejects when
 
     * the challenger's holdout loss rose past the champion's by more than
       :func:`effective_holdout_margin` (a real holdout regression, not
@@ -654,11 +656,19 @@ def _holdout_confirms(
     confirmation that no achievable margin can satisfy is not a confirmation,
     it is a second gate. Both knobs default to the strict setting.
 
-    The holdout is never asked to clear the margin in the *improving*
-    direction — a train-measured win that merely holds flat on the holdout
-    is a confirmation rather than a failure. This is the asymmetry that makes the
-    holdout a guard against board-memorization rather than a second,
-    stricter promotion bar.
+    By default the holdout is never asked to clear the margin in the
+    *improving* direction — a train-measured win that merely holds flat on the
+    holdout is a confirmation rather than a failure. This is the asymmetry that
+    makes the holdout a guard against board-memorization rather than a second,
+    stricter promotion bar. A contract that wants the second bar sets
+    :attr:`ScoringWeights.holdout_confirmation` to ``"improve"``. The
+    challenger's holdout loss must then also fall by more than
+    ``max(holdout_min_gain, holdout_min_gain_ratio × train_gain)``. This check
+    comes after the regression band and the pass-rate rule, so a regression
+    still reports as a regression. ``train_gain`` is the train loss drop that
+    the caller measured (champion scalar minus challenger scalar). It is
+    required, so a caller cannot drop the scaled bar. The reason names the bar
+    that fired.
     """
     if holdout_parent_agg.get("incomplete_entries") or holdout_child_agg.get("incomplete_entries"):
         return "holdout_not_confirmed: incomplete execution of requested board units"
@@ -697,6 +707,25 @@ def _holdout_confirms(
         )
         if reason:
             return reason
+    if weights.holdout_confirmation == "improve":
+        # The bar scales with the train gain (``holdout_min_gain_ratio``): a
+        # train win much larger than its holdout gain is usually a fit to the
+        # train slice.
+        fixed_bar = float(weights.holdout_min_gain)
+        ratio = float(weights.holdout_min_gain_ratio)
+        scaled_bar = ratio * max(float(train_gain), 0.0)
+        min_gain = max(fixed_bar, scaled_bar)
+        if scaled_bar > fixed_bar:
+            bar = f"holdout_min_gain_ratio {ratio:g} x train gain {float(train_gain):.6f}"
+        else:
+            bar = "holdout_min_gain"
+        if not parent_scalar - child_scalar > min_gain:
+            return (
+                f"holdout_not_confirmed: an 'improve' confirmation needs the holdout "
+                f"loss to fall by more than {min_gain:.6f} ({bar}); it changed by "
+                f"{child_scalar - parent_scalar:+.6f} "
+                f"(champion {parent_scalar:.6f} -> challenger {child_scalar:.6f})"
+            )
     return ""
 
 
@@ -704,6 +733,8 @@ def holdout_confirms(
     holdout_parent_agg: dict[str, Any],
     holdout_child_agg: dict[str, Any],
     weights: ScoringWeights,
+    *,
+    train_gain: float,
 ) -> str:
     """Public wrapper for the holdout-confirmation check (OVERFITTING.md §12 #1).
 
@@ -712,9 +743,11 @@ def holdout_confirms(
     (:mod:`zicato.tournament.ladder`) can compute the raw confirmation bit
     *out of band* — the Ladder then decides whether to release that bit this
     round. :func:`evaluate_gate` still calls the same logic internally for the
-    non-Ladder (raw Phase-A) path.
+    non-Ladder (raw Phase-A) path. ``train_gain`` is the train loss drop
+    (champion scalar minus challenger scalar) that the ``"improve"`` bar
+    scales with. It is required, so that no caller drops that bar.
     """
-    return _holdout_confirms(holdout_parent_agg, holdout_child_agg, weights)
+    return _holdout_confirms(holdout_parent_agg, holdout_child_agg, weights, train_gain=train_gain)
 
 
 def _component(agg: dict[str, Any], name: str) -> float:
@@ -1052,7 +1085,12 @@ def evaluate_gate(
     if holdout_parent_agg is not None and holdout_child_agg is not None:
         active_rule = rule("holdout_confirmation", "Holdout confirmation")
         rules.append(active_rule)
-        holdout_reason = _holdout_confirms(holdout_parent_agg, holdout_child_agg, weights)
+        holdout_reason = _holdout_confirms(
+            holdout_parent_agg,
+            holdout_child_agg,
+            weights,
+            train_gain=parent_scalar - child_scalar,
+        )
         if holdout_reason:
             return finish(
                 decision=TournamentDecision.REJECTED,

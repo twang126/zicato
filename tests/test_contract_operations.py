@@ -887,6 +887,27 @@ def test_set_gate_holdout_confirmation_bounds() -> None:
         ops.set_gate(TournamentDraft(), holdout_entry_regression_budget=-1)
 
 
+def test_set_gate_holdout_improve_bar() -> None:
+    import pytest
+
+    draft = TournamentDraft()
+    patch = ops.set_gate(
+        draft,
+        holdout_confirmation="improve",
+        holdout_min_gain=0.02,
+        holdout_min_gain_ratio=0.5,
+    )
+    assert draft.scoring.holdout_confirmation == "improve"
+    assert patch.changed["holdout_confirmation"] == {"from": "no_regression", "to": "improve"}
+    assert patch.changed["holdout_min_gain"] == {"from": 0.0, "to": 0.02}
+    assert patch.changed["holdout_min_gain_ratio"] == {"from": 0.0, "to": 0.5}
+    assert ops.set_gate(draft, holdout_min_gain_ratio=0.5).changed == {}
+    with pytest.raises(ValueError, match="holdout_min_gain_ratio"):
+        ops.set_gate(draft, holdout_min_gain_ratio=1.5)
+    with pytest.raises(ValueError, match="holdout_confirmation"):
+        ops.set_gate(draft, holdout_confirmation="sometimes")
+
+
 def test_set_namespace_weights() -> None:
     import pytest
 

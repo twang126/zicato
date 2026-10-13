@@ -247,5 +247,5 @@ def test_incomplete_confirmation_cannot_promote(tmp_path: Path) -> None:
     assert verdict.decision == "deferred"
     assert "incomplete execution" in verdict.reason
     assert "incomplete execution" in holdout_confirms(
-        aggregate_generation_score([complete], weights), holdout, weights
+        aggregate_generation_score([complete], weights), holdout, weights, train_gain=2.0
     )

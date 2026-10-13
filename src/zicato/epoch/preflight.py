@@ -778,8 +778,8 @@ def holdout_window_note(weights: ScoringWeights, holdout_entries: int) -> str | 
     with nothing in the pre-flight to explain them.
 
     This is a WARNING-class note, never a verdict and never a refusal. It
-    reports two feasibility facts an operator cannot otherwise see without
-    doing the arithmetic:
+    reports up to three feasibility facts an operator cannot otherwise see
+    without doing the arithmetic:
 
     * the scalar bound — one holdout entry flipping pass→fail moves the
       holdout scalar by about ``pass_weight / N``, so the holdout margin must
@@ -794,10 +794,13 @@ def holdout_window_note(weights: ScoringWeights, holdout_entries: int) -> str | 
       either scope, because that rule carries only a float-noise tolerance and
       no scalar bound is consulted once it fires. Raising the holdout margin
       cannot fix this one; only the budget can.
+    * the scaled ``"improve"`` bar — with
+      :attr:`~zicato.core.ScoringWeights.holdout_min_gain_ratio` on, a train
+      gain above ``step / ratio`` needs more than one holdout entry to improve.
 
     ``None`` when there is no holdout to speak of (``holdout_entries <= 0``:
     the split is disabled or the board was too small), or when both bounds are
-    comfortable.
+    comfortable and the scaled ``"improve"`` bar is off.
     """
     from zicato.tournament.gate import effective_holdout_margin  # noqa: PLC0415
 
@@ -827,6 +830,16 @@ def holdout_window_note(weights: ScoringWeights, holdout_entries: int) -> str | 
             "holdout_margin (commensurable with promote_margin at "
             "promote_margin x N_train/N_holdout) rather than raising "
             "promote_margin, which would also raise the train bar"
+        )
+    ratio = float(weights.holdout_min_gain_ratio)
+    if weights.holdout_confirmation == "improve" and ratio > 0:
+        notes.append(
+            f"holdout_min_gain_ratio={ratio:g} asks the holdout loss to fall by more "
+            f"than {ratio:g} x the train gain; the {holdout_entries}-entry holdout "
+            f"moves in steps of ~{step:.6g}, so a train gain above ~{step / ratio:.6g} "
+            "needs more than one holdout entry to improve, and the crowned "
+            "challenger's train gain is biased upward when several challengers "
+            "compete"
         )
     if not notes:
         return None

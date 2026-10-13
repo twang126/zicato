@@ -392,6 +392,9 @@ def set_gate(
     promote_margin: float | None = None,
     holdout_margin: float | None = None,
     holdout_entry_regression_budget: int | None = None,
+    holdout_confirmation: str | None = None,
+    holdout_min_gain: float | None = None,
+    holdout_min_gain_ratio: float | None = None,
     monotonicity: bool | None = None,
     monotonicity_scope: str | None = None,
     namespace_monotonicity: dict[str, bool] | None = None,
@@ -420,6 +423,10 @@ def set_gate(
     :func:`set_holdout`: ``None`` here means "leave unchanged", so a
     NEGATIVE ``holdout_margin`` is the token that RESETS the field to auto
     (``None`` — reuse ``promote_margin``); a non-negative value pins it.
+    ``holdout_confirmation`` selects if the holdout must only not regress
+    (``"no_regression"``) or must also improve (``"improve"``). Under
+    ``"improve"``, the holdout loss must fall by more than
+    ``max(holdout_min_gain, holdout_min_gain_ratio × train loss drop)``.
 
     The remaining keywords cover the rest of the gate contract:
     ``namespace_monotonicity`` replaces the per-namespace strict-
@@ -461,6 +468,17 @@ def set_gate(
                 "from": draft.scoring.holdout_entry_regression_budget,
                 "to": holdout_entry_regression_budget,
             }
+    for name, value in (
+        ("holdout_confirmation", holdout_confirmation),
+        ("holdout_min_gain", holdout_min_gain),
+        ("holdout_min_gain_ratio", holdout_min_gain_ratio),
+    ):
+        if value is None:
+            continue
+        require_knob(ScoringWeights, name, value)
+        if value != getattr(draft.scoring, name):
+            scoring_changes[name] = value
+            changed[name] = {"from": getattr(draft.scoring, name), "to": value}
     if monotonicity is not None and monotonicity != draft.scoring.pass_rate_monotonicity:
         scoring_changes["pass_rate_monotonicity"] = monotonicity
         changed["pass_rate_monotonicity"] = {

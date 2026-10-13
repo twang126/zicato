@@ -462,7 +462,12 @@ def _ladder_mediated_outcome(
     raw_reason = "holdout confirmation incomplete: execution did not complete"
     if observation_complete and holdout_parent_agg is not None and holdout_child_agg is not None:
         holdout_scalar = float(holdout_child_agg["scalar"])
-        raw_reason = holdout_confirms(holdout_parent_agg, holdout_child_agg, weights)
+        raw_reason = holdout_confirms(
+            holdout_parent_agg,
+            holdout_child_agg,
+            weights,
+            train_gain=train_parent_scalar - train_child_scalar,
+        )
     raw_confirmed = observation_complete and not raw_reason
 
     # Without the governor, complete raw holdout confirmation is still required.

@@ -712,8 +712,11 @@
         "tournament_structures": false
       },
       "goldfive": null,
+      "holdout_confirmation": "no_regression",
       "holdout_entry_regression_budget": 0,
       "holdout_margin": null,
+      "holdout_min_gain": 0.0,
+      "holdout_min_gain_ratio": 0.0,
       "mutation_surface": {},
       "namespace_monotonicity": {
         "drift:": false,
@@ -2156,8 +2159,11 @@
         "tournament_structures": false
       },
       "goldfive": null,
+      "holdout_confirmation": "no_regression",
       "holdout_entry_regression_budget": 0,
       "holdout_margin": null,
+      "holdout_min_gain": 0.0,
+      "holdout_min_gain_ratio": 0.0,
       "mutation_surface": {},
       "namespace_monotonicity": {
         "drift:": false,
@@ -10271,8 +10277,11 @@
         "tournament_structures": false
       },
       "goldfive": null,
+      "holdout_confirmation": "no_regression",
       "holdout_entry_regression_budget": 0,
       "holdout_margin": null,
+      "holdout_min_gain": 0.0,
+      "holdout_min_gain_ratio": 0.0,
       "mutation_surface": {},
       "namespace_monotonicity": {
         "drift:": false,
@@ -10385,8 +10394,11 @@
         "tournament_structures": false
       },
       "goldfive": null,
+      "holdout_confirmation": "no_regression",
       "holdout_entry_regression_budget": 0,
       "holdout_margin": null,
+      "holdout_min_gain": 0.0,
+      "holdout_min_gain_ratio": 0.0,
       "mutation_surface": {},
       "namespace_monotonicity": {
         "drift:": false,

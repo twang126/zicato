@@ -110,6 +110,72 @@ def test_holdout_flat_is_a_confirmation_not_a_failure() -> None:
     assert outcome.decision == "promoted"
 
 
+# ---------------------------------------------------------------------------
+# ``holdout_confirmation="improve"``: the holdout becomes a second bar. A
+# train win that is flat on the holdout is rejected. One that improves there
+# by more than ``holdout_min_gain`` is promoted. A regression still reports
+# as a regression.
+# ---------------------------------------------------------------------------
+
+
+def _improve_case(h_child_scalar: float, *, min_gain: float = 0.0) -> GateOutcome:
+    parent = _agg(scalar=1.0, per_entry={"a": {"pass_fail": True}})
+    child = _agg(scalar=0.5, per_entry={"a": {"pass_fail": True}})  # a clear train win
+    h_parent = _agg(scalar=1.0, per_entry={"h": {"pass_fail": True}})
+    h_child = _agg(scalar=h_child_scalar, per_entry={"h": {"pass_fail": True}})
+    weights = ScoringWeights(
+        promote_margin=0.1, holdout_confirmation="improve", holdout_min_gain=min_gain
+    )
+    return evaluate_gate(
+        parent, child, weights, holdout_parent_agg=h_parent, holdout_child_agg=h_child
+    )
+
+
+def test_improve_confirmation_rejects_a_flat_holdout() -> None:
+    outcome = _improve_case(1.0)
+    assert outcome.decision == "rejected"
+    assert outcome.reason.startswith("holdout_not_confirmed: an 'improve' confirmation")
+    assert "changed by +0.000000" in outcome.reason
+    assert outcome.delta_scalar == pytest.approx(-0.5)  # still the train delta
+
+
+def test_improve_confirmation_promotes_a_holdout_gain() -> None:
+    outcome = _improve_case(0.9)
+    assert outcome.decision == "promoted"
+    assert outcome.reason == ""
+
+
+def test_improve_confirmation_honours_min_gain() -> None:
+    assert _improve_case(0.9, min_gain=0.2).decision == "rejected"
+    assert _improve_case(0.7, min_gain=0.2).decision == "promoted"
+
+
+def test_improve_confirmation_reports_a_regression_as_one() -> None:
+    outcome = _improve_case(1.5)
+    assert outcome.decision == "rejected"
+    assert "holdout loss rose by" in outcome.reason
+
+
+def test_improve_confirmation_reports_a_pass_rate_regression_as_one() -> None:
+    parent = _agg(scalar=1.0, per_entry={"a": {"pass_fail": True}})
+    child = _agg(scalar=0.5, per_entry={"a": {"pass_fail": True}})
+    h_parent = _agg(scalar=1.0, per_entry={"h": {"pass_fail": True}})
+    h_child = _agg(scalar=1.0, per_entry={"h": {"pass_fail": False}})  # flat, and h flipped
+    weights = ScoringWeights(promote_margin=0.1, holdout_confirmation="improve")
+    outcome = evaluate_gate(
+        parent, child, weights, holdout_parent_agg=h_parent, holdout_child_agg=h_child
+    )
+    assert outcome.decision == "rejected"
+    assert "pass-rate regression" in outcome.reason
+
+
+def test_holdout_confirmation_refuses_an_unknown_mode_and_a_negative_gain() -> None:
+    with pytest.raises(ValueError, match="holdout_confirmation"):
+        ScoringWeights(holdout_confirmation="sometimes")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="holdout_min_gain"):
+        ScoringWeights(holdout_min_gain=-0.1)
+
+
 def test_train_reject_fires_before_holdout_confirmation() -> None:
     # A train-side reject (insufficient margin) must surface its own reason,
     # not a holdout reason — the holdout step only runs after the train rules

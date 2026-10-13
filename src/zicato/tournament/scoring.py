@@ -460,6 +460,11 @@ def aggregate_namespaced_metrics(
     from the loss data appear with an aggregate of ``0.0`` so the keys are
     predictable for downstream consumers.
 
+    A namespace listed in :attr:`ScoringWeights.scorer_metric_namespaces`
+    is meaned over the losses that report it rather than over all losses
+    ("not measured is not zero"), so a run that produced no scorer metric
+    neither lowers nor raises it.
+
     Unnamespaced metric names (no colon prefix) are silently ignored.
     Namespaces present in the data but with no weight configured are
     aggregated at weight ``0.0`` (so they show up as ``0.0`` in the
@@ -498,7 +503,7 @@ def aggregate_namespaced_metrics(
         # the same namespace counts each entry, and a loss with none
         # contributes zero.
         per_loss: dict[str, list[float]] = {}
-        for mc in loss.scoring_metrics():
+        for mc in loss.scoring_metrics(weights.scorer_metric_namespaces):
             ns = _namespace_of(mc.name)
             if not ns or ns == "drift:":
                 # Drift is already reduced into ``drift_loss`` above; its
@@ -517,7 +522,17 @@ def aggregate_namespaced_metrics(
     for ns in observed_namespaces:
         if ns == "drift:":
             continue
-        mean_val = sums.get(ns, 0.0) / n_losses if n_losses > 0 else 0.0
+        # A namespace the contract opts into from the scorer's own metrics
+        # follows the metrics rule "not measured is not zero": it is meaned
+        # over the runs that report it, as the replicate fold means it over
+        # the replicates that report it. An aborted or silent run then
+        # cannot pull a lower-is-better scorer term toward zero; it pays
+        # through the failure: channel instead.
+        if ns in weights.scorer_metric_namespaces:
+            reporting = len(terms.get(ns, ()))
+            mean_val = sums.get(ns, 0.0) / reporting if reporting else 0.0
+        else:
+            mean_val = sums.get(ns, 0.0) / n_losses if n_losses > 0 else 0.0
         ns_weight = weights.namespace_weights.get(ns, 0.0)
         namespace_means[ns] = ns_weight * mean_val
 

@@ -1221,7 +1221,10 @@ Aggregated:
   `pass_fail` only) gets the same arithmetic as a scored one — 1 of 4 replicates
   passing reads `0.25` rather than the single majority bit;
 - `metrics` — per-key mean over the replicates reporting the key, so the
-  decomposition decomposes the folded `score` beside it;
+  decomposition decomposes the folded `score` beside it. A namespace the
+  contract scores from these metrics (`scorer_metric_namespaces`) is meaned
+  over the runs reporting it in `aggregate_namespaced_metrics` too, so the
+  namespace aggregate over the fold equals the aggregate over the replicates;
 - `metric_counts` (and the `tokens_spent` / `output_chars` / `schema_failures`
   scalars) — namespace-bearing via `aggregate_namespaced_metrics`, whose
   per-namespace values are summed into the scalar for any contract with a
@@ -2022,7 +2025,13 @@ uv run pytest tests/test_decision_procedure_power.py tests/test_convergence_know
 1. Choose a namespace prefix with the trailing colon (`"mycost:"`) and emit
    `MetricCount(name="mycost:<metric>", count=...)` rows from the reducer (or
    an adapter-side emission the reducer folds through
-   `LossProfile.scoring_metrics()`).
+   `LossProfile.scoring_metrics()`). A value that only the scorer can
+   measure (for example the size of a candidate's files) can come from the
+   scorer's own `metrics` instead: list the namespace in
+   `scorer_metric_namespaces`, and `scoring_metrics` adds those metrics.
+   The reserved namespaces (`RESERVED_METRIC_NAMESPACES`: drift, judge,
+   failure, runtime, cost, output, schema) are refused there, so a scorer
+   cannot replace a measured channel.
 2. Add the coefficient to the operator contract's
    `namespace_weights` — sign encodes direction (§1.5): positive =
    higher-is-worse. Zero means "tracked, never scored" — a legitimate first

@@ -767,6 +767,7 @@
       ],
       "regression_timeout_s": 600,
       "scalar_fn": "",
+      "scorer_metric_namespaces": [],
       "severity_weights": {
         "critical": 10.0,
         "info": 1.0,
@@ -2211,6 +2212,7 @@
       ],
       "regression_timeout_s": 600,
       "scalar_fn": "",
+      "scorer_metric_namespaces": [],
       "severity_weights": {
         "critical": 10.0,
         "info": 1.0,
@@ -10326,6 +10328,7 @@
       ],
       "regression_timeout_s": 600,
       "scalar_fn": "",
+      "scorer_metric_namespaces": [],
       "severity_weights": {
         "critical": 10.0,
         "info": 1.0,
@@ -10440,6 +10443,7 @@
       ],
       "regression_timeout_s": 600,
       "scalar_fn": "",
+      "scorer_metric_namespaces": [],
       "severity_weights": {
         "critical": 10.0,
         "info": 1.0,

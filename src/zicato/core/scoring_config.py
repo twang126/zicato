@@ -6,6 +6,7 @@ Split out of :mod:`zicato.core.types`; re-exported from there and from
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -55,6 +56,17 @@ KNOWN_TELEMETRY_DIALECTS: frozenset[str] = frozenset(
 #: model call, ``"llm"`` issues one merge call that can also resolve an
 #: overlap. See :attr:`ExperimentalConfig.recombine_merge`.
 RECOMBINE_MERGE_MODES: tuple[str, ...] = ("mechanical", "llm")
+
+#: Namespaces filled by the telemetry reducer or derived by
+#: :meth:`~zicato.core.loss.LossProfile.scoring_metrics`. A contract may not
+#: list them in :attr:`ScoringWeights.scorer_metric_namespaces`.
+RESERVED_METRIC_NAMESPACES: frozenset[str] = frozenset(
+    {"drift:", "judge:", "failure:", "runtime:", "cost:", "output:", "schema:"}
+)
+
+#: One namespace with its trailing colon. The prefix must be non-empty: the
+#: scalar names each component after it, so ``":"`` would add an empty key.
+_SCORER_NAMESPACE = re.compile(r"[^\s:]+:")
 
 
 # ---------------------------------------------------------------------------
@@ -678,6 +690,20 @@ class ScoringWeights:
         channel carries the task-failure and not-completed terms and a
         contract must not be able to make crashing free. See
         :func:`_default_namespace_weights` for the shipped values.
+    scorer_metric_namespaces:
+        The namespaces of the scorer's own metrics that the scalar scores,
+        for example ``("size:",)``. A scorer metric named ``"size:words"``
+        is scored only when its namespace is listed here, at the
+        :attr:`namespace_weights` coefficient for that namespace. Every
+        other scorer metric is recorded and left out of the scalar. Empty
+        (the default) scores no scorer metric, so a scorer that adds a
+        ``rubric:`` key does not change the loss or engage the ``rubric:``
+        monotonicity guard until the contract opts in. Each listed
+        namespace needs a :attr:`namespace_weights` coefficient. The list is
+        a set: order and repeats do not change the contract hash. A listed
+        namespace is meaned over the runs that report it ("not measured is
+        not zero"). The namespaces the reducer and the derived channels fill
+        (:data:`RESERVED_METRIC_NAMESPACES`) are refused at load.
     namespace_monotonicity:
         Per-namespace strict-monotonicity flags. When a namespace's flag
         is on, the promote gate rejects a challenger whose per-namespace
@@ -827,6 +853,10 @@ class ScoringWeights:
     )
     namespace_monotonicity: Mapping[str, bool] = field(
         default_factory=_default_namespace_monotonicity,
+        metadata=_knob(),
+    )
+    scorer_metric_namespaces: tuple[str, ...] = field(
+        default=(),
         metadata=_knob(),
     )
     tournament_structure: TournamentStructure = field(
@@ -1018,6 +1048,14 @@ class ScoringWeights:
             if not isinstance(self.goldfive, Mapping):
                 raise ValueError("goldfive must be an object or null")
             object.__setattr__(self, "goldfive", _freeze_json(self.goldfive))
+        # The namespaces form a set: order and repeats do not change what is
+        # scored, so equivalent lists canonicalize, and hash, alike (G6).
+        namespaces = self.scorer_metric_namespaces
+        if not isinstance(namespaces, tuple | list | set | frozenset) or any(
+            not isinstance(namespace, str) for namespace in namespaces
+        ):
+            raise ValueError("scorer_metric_namespaces must be a list of namespace strings")
+        object.__setattr__(self, "scorer_metric_namespaces", tuple(sorted(set(namespaces))))
         validate_knobs(self)
         require_finite_mapping("severity_weights", self.severity_weights)
         require_finite_mapping("per_kind_weights", self.per_kind_weights)
@@ -1040,6 +1078,30 @@ class ScoringWeights:
                 "not be able to make crashing free. Dampen it with a small "
                 "positive coefficient instead of zeroing it."
             )
+        # A reserved namespace belongs to the reducer or a derived channel. A
+        # scorer metric there would add terms to a measured channel, for
+        # example a negative ``failure:`` term that offsets a crash.
+        for namespace in self.scorer_metric_namespaces:
+            if not _SCORER_NAMESPACE.fullmatch(namespace):
+                raise ValueError(
+                    f"scorer_metric_namespaces entry {namespace!r} must be one "
+                    "non-empty namespace without whitespace, with its trailing "
+                    'colon, such as "size:".'
+                )
+            if namespace in RESERVED_METRIC_NAMESPACES:
+                raise ValueError(
+                    f"scorer_metric_namespaces entry {namespace!r} is reserved: "
+                    "the reducer or a derived channel fills it, and a scorer "
+                    "metric must not replace that measurement."
+                )
+            # A listed namespace with no coefficient would aggregate at 0.0 and
+            # never reach the scalar, while the operator believes it is scored.
+            if namespace not in self.namespace_weights:
+                raise ValueError(
+                    f"scorer_metric_namespaces entry {namespace!r} has no "
+                    "namespace_weights coefficient, so it would never be scored; "
+                    f'add namespace_weights["{namespace}"].'
+                )
         # ``custom`` / ``custom:<judge>`` drift is scored in the ``judge:``
         # channel via per_judge_weights, never through per_kind_weights, so a
         # per_kind_weights entry for it would be silently inert. Reject it

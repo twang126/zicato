@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time  # noqa: F401  — kept as the ``orch.time`` clock seam (see __all__)
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -550,7 +551,11 @@ def _render_loss_summary(losses: list[Any], priorities: Any = None) -> str:
         _mean_named_terms(losses, priorities.judges, _judge_loss_values),
     )
     parts.extend(
-        _mean_named_terms(losses, priorities.namespace_metrics, _metric_values),
+        _mean_named_terms(
+            losses,
+            priorities.namespace_metrics,
+            lambda loss: _metric_values(loss, priorities.scorer_namespaces),
+        ),
     )
     return ", ".join(parts) or "(the terms this contract scores have no measurement yet)"
 
@@ -570,9 +575,25 @@ def _judge_loss_values(loss: Any) -> dict[str, float]:
     }
 
 
-def _metric_values(loss: Any) -> dict[str, float]:
-    """One run's merged namespaced metric view, by metric name."""
-    return {mc.name: mc.count for mc in loss.scoring_metrics()}
+def _metric_values(loss: Any, scorer_namespaces: tuple[str, ...] = ()) -> dict[str, float]:
+    """One run's merged namespaced metric view, by metric name.
+
+    A namespace the contract scores from the scorer's own metrics
+    (``scorer_namespaces``) is reported as ONE value under its prefix: the
+    run's total in that namespace. The scorer chooses its metric names at
+    run time, so a name can carry an entry id or task text; only the
+    namespace may reach the proposer (G8, 05-proposer.md §5.8.1).
+    """
+    values = {mc.name: mc.count for mc in loss.scoring_metrics()}
+    for namespace in scorer_namespaces:
+        scored = [
+            float(value)
+            for name, value in (getattr(loss, "metrics", None) or {}).items()
+            if name.startswith(namespace) and math.isfinite(value)
+        ]
+        if scored:
+            values.setdefault(namespace, math.fsum(scored))
+    return values
 
 
 def _mean_named_terms(
@@ -661,6 +682,11 @@ def build_metric_priorities(board: list[Any], weights: Any, losses: list[Any]) -
         if kind != "custom" and not kind.startswith("custom:")
     ]
 
+    # A namespace scored from the scorer's own metrics is named by its prefix
+    # alone: the scorer picks its metric names at run time, and a name can
+    # carry an entry id or task text (G8). The loss summary reports the
+    # namespace total under that prefix (``_metric_values``).
+    scorer_namespaces = tuple(getattr(weights, "scorer_metric_namespaces", ()) or ())
     observed: set[str] = set()
     for loss in losses:
         observed.update(mc.name for mc in loss.scoring_metrics())
@@ -680,4 +706,5 @@ def build_metric_priorities(board: list[Any], weights: Any, losses: list[Any]) -
         drift_kinds=_ranked([t for t in drift_kinds if t.weight]),
         pass_rate_weight=float(getattr(weights, "pass_weight", 0.0) or 0.0),
         namespace_metrics=_ranked(namespace_metrics),
+        scorer_namespaces=scorer_namespaces,
     )

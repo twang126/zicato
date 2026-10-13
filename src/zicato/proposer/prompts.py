@@ -255,12 +255,17 @@ class MetricPriorities:
         .scoring_metrics`), so a round with no losses yet carries the
         namespace prefixes alone (``cost:``, ``rubric:``) rather than
         inventing metric names.
+    scorer_namespaces:
+        The contract's ``scorer_metric_namespaces``: the scorer metrics that
+        the scalar scores. The loss summary reads metric values through the
+        same set, so a scored scorer metric shows its measured value.
     """
 
     judges: tuple[ScoredTarget, ...] = ()
     drift_kinds: tuple[ScoredTarget, ...] = ()
     pass_rate_weight: float = 0.0
     namespace_metrics: tuple[ScoredTarget, ...] = ()
+    scorer_namespaces: tuple[str, ...] = ()
 
     def is_empty(self) -> bool:
         """Whether the contract scores nothing this block could name."""

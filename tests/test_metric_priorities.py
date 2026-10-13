@@ -18,6 +18,8 @@ Two invariants recur and are the reason the split exists:
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from zicato.core import (
     BoardEntry,
     ExpectationResult,
@@ -282,3 +284,25 @@ class _JudgeSpecStub:
 
     def __init__(self, name: str) -> None:
         self.name = name
+
+
+def test_a_scored_scorer_namespace_reaches_the_proposer_by_its_prefix_only() -> None:
+    """A scorer picks its metric names at run time; a name can carry an entry id.
+
+    The proposer sees the namespace and its per-run total, never the names
+    (G8, 05-proposer.md §5.8.1).
+    """
+    loss = _loss_with("critical_judge", 0.4, 0.89)
+    loss = replace(loss, metrics={"size:q1_What is the capital of France?": 4.0})
+    default = ScoringWeights()
+    weights = ScoringWeights(
+        namespace_weights={**default.namespace_weights, "size:": 1.0},
+        scorer_metric_namespaces=("size:",),
+    )
+    priorities = build_metric_priorities([], weights, [loss])
+    rendered = render_metric_priorities_block(priorities)
+    summary = _render_loss_summary([loss], priorities)
+    assert "size:" in {t.name for t in priorities.namespace_metrics}
+    assert "capital of France" not in rendered
+    assert "capital of France" not in summary
+    assert "size:=4" in summary

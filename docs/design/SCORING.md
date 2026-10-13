@@ -182,7 +182,8 @@ The example shows the fields this document covers. A complete
 `scoring.json` also carries the holdout-confirmation bounds
 (`holdout_margin`, `holdout_entry_regression_budget`), the regression-suite
 gate (`regression_gate_enabled`, `regression_test_command`,
-`regression_timeout_s`), `namespace_monotonicity`, the `tournament` block,
+`regression_timeout_s`), `namespace_monotonicity`, `scorer_metric_namespaces`,
+the `tournament` block,
 and the `overfitting`, `proposer_quality`, and `experimental` blocks, plus
 the integrity switches and telemetry dialect. `zicato init` scaffolds a
 complete document, `zicato inspect config --scaffold --complete` prints
@@ -381,6 +382,25 @@ scalar = pass_weight * (1.0 - mean_score)
        + sum over SORTED namespaces ns of channel[ns]
        + diff_complexity term (only when experimental.diff_complexity_weight > 0)
 ```
+
+The namespaces come from `LossProfile.scoring_metrics()`: the measured
+metric counts plus the derived judge, failure and runtime channels. A
+scorer's own per-entry `metrics` join them only for the namespaces that the
+contract lists in `scorer_metric_namespaces` (default empty), at the
+`namespace_weights` coefficient. The opt-in keeps a scorer that adds a
+`rubric:` key for display from changing the loss or the `rubric:`
+monotonicity guard. The namespaces that the reducer or a derived channel
+fills are refused in that list, and a listed namespace needs a
+`namespace_weights` entry. The list is a set: order and repeats do not change
+the contract hash. A listed namespace follows the metrics rule "not measured
+is not zero" at both levels: the replicate fold means a scorer metric over
+the replicates that report it, and the scalar means the namespace over the
+runs that report it. An aborted or silent run therefore cannot pull a
+lower-is-better scorer term toward zero; it pays through the `failure:`
+channel instead. The proposer sees a listed namespace by its prefix and its
+per-run total only, never the scorer's own metric names, because a scorer
+chooses those names at run time and one can carry an entry id or task text
+(G8).
 
 The namespace sum is **sorted**. Float addition is not associative, and
 the namespace key set is assembled from a `set`, so an unsorted sum

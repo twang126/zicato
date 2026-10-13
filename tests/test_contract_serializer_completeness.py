@@ -104,8 +104,11 @@ _NONDEFAULT_VALUES: dict[str, dict[str, Any]] = {
         "regression_gate_enabled": True,
         "regression_test_command": ("python", "-m", "unittest"),
         "regression_timeout_s": 120,
-        "namespace_weights": {"drift:": 2.0, "failure:": 2.0, "cost:": 0.002},
+        "namespace_weights": {"drift:": 2.0, "failure:": 2.0, "cost:": 0.002, "latency:": 0.1},
         "namespace_monotonicity": {"drift:": True, "rubric:": False},
+        # A namespace the default namespace_weights already weight, so the
+        # value is valid on its own (a listed namespace needs a coefficient).
+        "scorer_metric_namespaces": ("latency:",),
         "tournament_structure": TournamentStructure(
             structure="racing", params={"rounds_n": 3, "nested": {"a": [1, 2, 3]}}
         ),

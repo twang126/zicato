@@ -13,7 +13,9 @@ from zicato.core import (
     MetricCount,
     MetricMovementActual,
     OutcomeRecord,
+    ScoringWeights,
 )
+from zicato.tournament.scoring import aggregate_namespaced_metrics
 
 # ---------------------------------------------------------------------------
 # Named metric construction
@@ -103,6 +105,134 @@ def test_scoring_metrics_of_a_clean_run_is_the_derived_channels_at_zero() -> Non
         "failure:not_completed": 0.0,
         "runtime:seconds": 1.0,
     }
+
+
+def test_scoring_metrics_leaves_scorer_metrics_out_by_default() -> None:
+    """A scorer metric is an observation until the contract opts its namespace in."""
+    profile = _bare_profile(metrics={"rubric:clarity": 0.8, "size:words": -0.1})
+    unified = {m.name for m in profile.scoring_metrics()}
+    assert "rubric:clarity" not in unified
+    assert "size:words" not in unified
+
+
+def test_scoring_metrics_admits_only_listed_scorer_namespaces() -> None:
+    profile = _bare_profile(
+        metrics={"size:words": -0.1, "rubric:clarity": 0.8, "weighted_score": 0.9},
+    )
+    unified = {m.name: m.count for m in profile.scoring_metrics(("size:",))}
+    assert unified["size:words"] == -0.1
+    assert "rubric:clarity" not in unified
+    assert "weighted_score" not in unified
+
+
+def test_scoring_metrics_skips_non_finite_scorer_metrics() -> None:
+    profile = _bare_profile(metrics={"size:words": float("nan")})
+    assert "size:words" not in {m.name for m in profile.scoring_metrics(("size:",))}
+
+
+def test_scorer_metrics_reach_the_aggregate_only_when_listed() -> None:
+    """The default rubric: weight does not score a scorer's rubric: key."""
+    profile = _bare_profile(metrics={"rubric:clarity": 0.8, "size:words": -0.1})
+    default = ScoringWeights()
+    assert aggregate_namespaced_metrics([profile], default)["rubric:"] == 0.0
+    opted_in = dataclasses.replace(
+        default,
+        namespace_weights={**default.namespace_weights, "size:": 1.0},
+        scorer_metric_namespaces=("size:",),
+    )
+    aggregates = aggregate_namespaced_metrics([profile], opted_in)
+    assert aggregates["size:"] == pytest.approx(-0.1)
+    assert aggregates["rubric:"] == 0.0
+
+
+@pytest.mark.parametrize("namespace", ["failure:", "cost:"])
+def test_scorer_metric_namespaces_refuses_a_reserved_namespace(namespace: str) -> None:
+    # A scorer must not be able to add terms to a measured channel.
+    with pytest.raises(ValueError, match="is reserved"):
+        ScoringWeights(scorer_metric_namespaces=(namespace,))
+
+
+@pytest.mark.parametrize("namespace", ["size", "a:b:", ":", " :", "my size:"])
+def test_scorer_metric_namespaces_refuses_a_malformed_namespace(namespace: str) -> None:
+    with pytest.raises(ValueError, match="must be one non-empty namespace"):
+        ScoringWeights(scorer_metric_namespaces=(namespace,))
+
+
+@pytest.mark.parametrize("value", [(1,), (["latency:"],), "latency:"])
+def test_scorer_metric_namespaces_refuses_a_value_that_is_not_a_list_of_strings(
+    value: object,
+) -> None:
+    with pytest.raises(ValueError, match="list of namespace strings"):
+        ScoringWeights(scorer_metric_namespaces=value)  # type: ignore[arg-type]
+
+
+def _weights_scoring(*namespaces: str) -> ScoringWeights:
+    default = ScoringWeights()
+    return ScoringWeights(
+        namespace_weights={**default.namespace_weights, **dict.fromkeys(namespaces, 1.0)},
+        scorer_metric_namespaces=namespaces,
+    )
+
+
+def test_scorer_metric_namespaces_accepts_a_plain_namespace() -> None:
+    assert _weights_scoring("size:").scorer_metric_namespaces == ("size:",)
+
+
+def test_scorer_metric_namespaces_is_a_set_for_the_contract_hash() -> None:
+    """Order and repeats do not change what is scored, so they do not change the hash."""
+    from zicato.epoch.contract import scoring_to_canon
+
+    listed = _weights_scoring("size:", "a:")
+    shuffled = dataclasses.replace(listed, scorer_metric_namespaces=("a:", "size:", "a:"))
+    assert shuffled.scorer_metric_namespaces == ("a:", "size:")
+    as_set = dataclasses.replace(listed, scorer_metric_namespaces=frozenset({"size:", "a:"}))
+    assert as_set.scorer_metric_namespaces == ("a:", "size:")
+    assert scoring_to_canon(shuffled) == scoring_to_canon(listed)
+
+
+def test_a_scorer_namespace_without_a_weight_is_refused() -> None:
+    """It would aggregate at zero and never reach the scalar."""
+    with pytest.raises(ValueError, match="has no namespace_weights coefficient"):
+        ScoringWeights(scorer_metric_namespaces=("size:",))
+
+
+def test_the_replicate_fold_averages_a_scored_metric_over_the_replicates_that_report_it() -> None:
+    """The fold keeps the metrics rule "not measured is not zero" (issue #575)."""
+    from zicato.tournament.scoring import average_replicate_losses
+
+    weights = _weights_scoring("size:")
+    four = _bare_profile(metrics={"size:words": 4.0})
+    two = _bare_profile(metrics={"size:words": 2.0})
+    silent = _bare_profile(metrics=None)
+    folded = average_replicate_losses([{"e1": four}, {"e1": two}])["e1"]
+    assert aggregate_namespaced_metrics([folded], weights)["size:"] == pytest.approx(3.0)
+    # An aborted replicate reports no metric and does not vote; it pays
+    # through the failure channel instead.
+    folded = average_replicate_losses([{"e1": four}, {"e1": silent}])["e1"]
+    assert aggregate_namespaced_metrics([folded], weights)["size:"] == pytest.approx(4.0)
+
+
+def test_a_scored_namespace_is_meaned_over_the_entries_that_report_it() -> None:
+    """A silent entry cannot pull a lower-is-better scorer term toward zero.
+
+    The fold of one entry's replicates and the aggregate over entries use the
+    same rule, so the two views of one duel agree.
+    """
+    from zicato.tournament.scoring import average_replicate_losses
+
+    weights = _weights_scoring("size:")
+    ten = _bare_profile(metrics={"size:words": 10.0})
+    silent = _bare_profile(metrics=None)
+    assert aggregate_namespaced_metrics([ten, silent], weights)["size:"] == pytest.approx(10.0)
+    folded = average_replicate_losses([{"e1": ten}, {"e1": silent}])["e1"]
+    assert aggregate_namespaced_metrics([folded], weights)["size:"] == pytest.approx(10.0)
+    # A measured namespace keeps counting a silent run as zero.
+    cost = _bare_profile(
+        metric_counts=(MetricCount(name="cost:llm_calls", severity="", count=4.0),)
+    )
+    assert aggregate_namespaced_metrics([cost, silent], weights)["cost:"] == pytest.approx(
+        weights.namespace_weights["cost:"] * 2.0
+    )
 
 
 def test_scoring_metrics_with_explicit_metric_counts_includes_all_namespaces() -> None:

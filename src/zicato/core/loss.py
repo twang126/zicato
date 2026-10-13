@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import math
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -390,11 +391,14 @@ class LossProfile:
     # Such a fold cannot claim that all inputs share a known execution seed.
     source_measurements: tuple[MeasurementDraw | None, ...] = ()
 
-    def scoring_metrics(self) -> tuple[MetricCount, ...]:
+    def scoring_metrics(self, scorer_namespaces: Collection[str] = ()) -> tuple[MetricCount, ...]:
         """Measured metrics plus judge, failure, and runtime scoring channels.
 
         Derived channels retain their raw units; scoring applies contract
         coefficients. A measured entry of the same name takes precedence.
+        ``scorer_namespaces`` adds the scorer metrics whose namespace it
+        lists (:attr:`~zicato.core.ScoringWeights.scorer_metric_namespaces`);
+        empty, the default, adds none.
         """
         out = list(self.metric_counts)
         derived: list[MetricCount] = [
@@ -418,6 +422,19 @@ class LossProfile:
                 continue
             out.append(mc)
             seen_names.add(mc.name)
+        # A scorer metric reaches the scalar only when the contract lists its
+        # namespace. The contract loader refuses the reserved namespaces, so
+        # a scorer cannot replace a measured channel.
+        if not scorer_namespaces:
+            return tuple(out)
+        for name, value in sorted((self.metrics or {}).items()):
+            namespace, sep, _ = name.partition(":")
+            if not sep or f"{namespace}:" not in scorer_namespaces:
+                continue
+            if name in seen_names or not math.isfinite(value):
+                continue
+            out.append(MetricCount(name=name, severity="", count=float(value)))
+            seen_names.add(name)
         return tuple(out)
 
 

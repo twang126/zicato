@@ -30,7 +30,10 @@ from zicato.core.measurement import (
 from zicato.runtime import progress_log
 from zicato.runtime.lock import WorkspaceLock
 from zicato.tournament import worker_execution
-from zicato.tournament.scoring import aggregate_generation_score
+from zicato.tournament.scoring import (
+    aggregate_generation_score,
+    count_infra_aborted_runs,
+)
 from zicato.tournament.scoring import (
     fold_matchup_replicates as _fold_replicate_runs,
 )
@@ -1228,7 +1231,7 @@ async def _run_replicated(
     fast: bool = False,
     matchup_budget_seconds: float | None = None,
     unit_semaphore: asyncio.Semaphore | None = None,
-) -> tuple[dict[str, LossProfile], dict[str, LossProfile], str, dict[str, _UnitProvenance]]:
+) -> tuple[dict[str, LossProfile], dict[str, LossProfile], str, dict[str, _UnitProvenance], int]:
     """Run a paired board ``replicates`` times, averaging per-entry losses.
 
     The §9-lever-1 replication knob. ``replicates == 1`` is the current
@@ -1285,8 +1288,10 @@ async def _run_replicated(
     provenance does not affect the champion-eval label.
 
     Returns ``(left_losses, right_losses, champion_eval_mode,
-    unit_provenance)`` where ``unit_provenance`` is the per-generation
-    cached-vs-fresh tally over both sides.
+    unit_provenance, infra_aborted_runs)`` where ``unit_provenance`` is the
+    per-generation cached-vs-fresh tally over both sides.
+    ``infra_aborted_runs`` is the number of runs on both sides with an infra
+    abort. It is counted before the fold, so each aborted run counts once.
     """
     validate_measurement_count(replicates)
     force_fresh = not fast
@@ -1357,7 +1362,7 @@ async def _run_replicated(
             unit_semaphore=unit_semaphore,
         )
         left_folded, right_folded = _fold_replicate_runs(runs)
-        return left_folded, right_folded, mode, provenance
+        return left_folded, right_folded, mode, provenance, _count_pair_infra_aborts(runs)
 
     for replicate_offset in range(replicate_count):
         # Every requested slot contributes either measurements or explicit
@@ -1384,7 +1389,14 @@ async def _run_replicated(
         runs.append((left_losses, right_losses))
 
     left_folded, right_folded = _fold_replicate_runs(runs)
-    return left_folded, right_folded, mode, provenance
+    return left_folded, right_folded, mode, provenance, _count_pair_infra_aborts(runs)
+
+
+def _count_pair_infra_aborts(
+    runs: list[tuple[dict[str, LossProfile], dict[str, LossProfile]]],
+) -> int:
+    """Count the infra-aborted runs on both sides of the unfolded slot maps."""
+    return count_infra_aborted_runs([side for run in runs for side in run])
 
 
 __all__ = [

@@ -2,7 +2,7 @@
 
 | Measurement | Delta |
 |---|---:|
-| Total | +396 |
+| Total | +394 |
 | Production | +168 |
 | Production logic | +90 |
 

@@ -246,8 +246,9 @@ def _load_parent_losses(
     1. Read a complete tournament draw-zero measurement at the selected seed.
     2. Otherwise fold the champion's usable calibration draws at that seed
        into one profile. Calibration can supply a baseline before the first
-       tournament. Folding preserves one profile per entry and retains the
-       first draw's matchup provenance.
+       tournament. Folding preserves one profile per entry and takes its
+       provenance from the representative draw (see
+       :func:`~zicato.tournament.scoring.average_replicate_losses`).
     3. If neither source supplies a profile, skip the entry.
 
     Discovery validates measurement paths and selects calibration by purpose.
@@ -294,7 +295,7 @@ def _load_parent_losses(
             canonical[entry.id] = profile
 
     # Build one board map per calibration measurement before folding.
-    # The fold keeps the first draw's provenance and one profile per entry.
+    # The fold keeps one profile per entry, with the representative draw's provenance.
 
     draws: dict[MeasurementDraw, dict[str, Any]] = {}
     for entry in uncovered:

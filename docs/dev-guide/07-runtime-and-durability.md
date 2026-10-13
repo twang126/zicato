@@ -1531,10 +1531,10 @@ counts the infra-aborted runs on the replicate maps BEFORE the fold
 `run_matchup` records the count in `TournamentResult.infra_aborted_runs`.
 `_count_infra_aborted_runs` reads that field. A folded profile stands for
 every replicate of one board entry, so the folded profiles are only the
-fallback for a result without the field. The fold also takes every
-single-run field (`abort_cause`, `not_completed_reason`, `run_id`) from one
-representative replicate: the first one with an infra abort, else replicate
-0. Thus an infra abort in a later replicate stays visible on the folded
+fallback for a result without the field. The fold also takes its
+pass-through fields, such as `abort_cause`, `not_completed_reason` and
+`run_id`, from one representative replicate: the first one with an infra
+abort, else replicate 0. Thus an infra abort in a later replicate stays visible on the folded
 profile.
 
 `execute_field_tournament` catches `_InfrastructureRoundDeferred`, clears the live tournament, and settles

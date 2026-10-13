@@ -2,8 +2,8 @@
 
 | Measurement | Delta |
 |---|---:|
-| Total | +180 |
-| Production | +54 |
+| Total | +207 |
+| Production | +55 |
 | Production logic | +21 |
 
 The replicate scheduler counts infra-aborted runs before the fold and records

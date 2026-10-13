@@ -1080,8 +1080,8 @@ async def _run_replicate_slots_full(
     its per-duel scorers.
 
     Returns the per-slot ``(left_losses, right_losses)`` maps in SLOT
-    order, starting at ``first_measurement``. The fold uses that first draw’s
-    provenance for its representative profile.
+    order, starting at ``first_measurement``. The fold takes its representative
+    profile from the first draw with an infra abort, else from that first draw.
     """
     validate_measurement_count(replicate_count)
     semaphore = _effective_unit_semaphore(unit_semaphore, config)

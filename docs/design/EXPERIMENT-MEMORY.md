@@ -403,9 +403,10 @@ standalone proposer call is unaffected by this surface.
 
 The frozen dataclass of §3.2 lives in `zicato.core.experiment` and is
 re-exported from `zicato.core.types`, which lists it in `__all__`. It
-carries nine fields: `generation_id`, `epoch_id`, `core_idea`,
+carries ten fields: `generation_id`, `epoch_id`, `core_idea`,
 `modulating`, `decision`, `rejection_reason`, `scalar_score_delta`,
-`same_contract`, and `prediction_accuracy`. The module-level constant
+`same_contract`, `prediction_accuracy` (`None` for an operator entry), and
+`source`. The module-level constant
 `EXPERIMENT_MEMORY_MAX_ENTRIES = 12` sits beside it, so the cap is
 defined once and imported wherever it is applied.
 

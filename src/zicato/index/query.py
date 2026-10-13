@@ -558,7 +558,11 @@ def prior_experiments_for_epoch(
             rejection_reason=str(row["rejection_reason"] or ""),
             scalar_score_delta=None if delta is None else float(delta),
             same_contract=True,
-            prediction_accuracy=_prediction_accuracy_for_row(row, ranges),
+            # The band grades the proposer's OWN predictions, so an operator
+            # entry carries none: its predictions never enter the calibration.
+            prediction_accuracy=(
+                None if _source_of(row) == "operator" else _prediction_accuracy_for_row(row, ranges)
+            ),
             source=_source_of(row),
         )
         if decision == "promoted":

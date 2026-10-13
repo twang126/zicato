@@ -7135,7 +7135,7 @@
       "pass_rate_delta": null,
       "rejection_reason": null,
       "scalar_score_delta": null,
-      "source": "proposer",
+      "source": null,
       "tournament_decision": null
     },
     {
@@ -7167,7 +7167,7 @@
       "pass_rate_delta": null,
       "rejection_reason": null,
       "scalar_score_delta": null,
-      "source": "proposer",
+      "source": null,
       "tournament_decision": null
     },
     {

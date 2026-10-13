@@ -336,7 +336,7 @@ marker a `v0` baseline carries.
 | `drift_loss_delta` | REAL | `outcome.drift_loss_delta` |
 | `pass_rate_delta` | REAL | `outcome.pass_rate_delta` |
 | `outcome_json` | TEXT (JSON) | the full resolved `outcome` block, verbatim |
-| `source` | TEXT | `"operator"` when the record carries `operator` (queued by `zicato proposer submit`), else `"proposer"` |
+| `source` | TEXT | `"operator"` when the record carries `operator` (queued by `zicato proposer submit`), `"proposer"` for a proposed candidate, NULL for the seed |
 | `author` | TEXT | `operator.author`; NULL for a proposer candidate |
 
 Primary key `(epoch_id, generation_id)`. The detail the index gives no

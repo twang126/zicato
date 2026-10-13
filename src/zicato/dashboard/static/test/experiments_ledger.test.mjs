@@ -49,7 +49,7 @@ function ledgerFixture(overrides) {
       {
         generation_id: 'v0', parent_generation_id: null, round_index: 0, core_idea: 'the seed',
         mutation_ids: [], decision: 'baseline', decision_label: 'seed (v0)', promoted: null, rejection_reason: null,
-        scalar_score_delta: null, drift_loss_delta: null, pass_rate_delta: null,
+        scalar_score_delta: null, drift_loss_delta: null, pass_rate_delta: null, source: null, author: null,
       },
       {
         generation_id: 'v2', parent_generation_id: 'v0', round_index: 1, core_idea: LONG_IDEA,
@@ -57,17 +57,19 @@ function ledgerFixture(overrides) {
         decision: 'rejected', decision_label: 'rejected', promoted: false,
         rejection_reason: 'insufficient improvement: 0.7328 vs 0.7188 (margin 0.0200)',
         scalar_score_delta: 0.014, drift_loss_delta: 0.01, pass_rate_delta: -0.25,
+        source: 'proposer', author: null,
       },
       {
         generation_id: 'v1', parent_generation_id: 'v0', round_index: 1, core_idea: 'trim the preamble',
         mutation_ids: ['prompt.system'], decision: 'promoted', decision_label: 'promoted', promoted: true,
         rejection_reason: null, scalar_score_delta: -0.08,
-        drift_loss_delta: -0.06, pass_rate_delta: 0.1,
+        drift_loss_delta: -0.06, pass_rate_delta: 0.1, source: 'proposer', author: null,
       },
       {
         generation_id: 'v3', parent_generation_id: 'v1', round_index: 2, core_idea: null, mutation_ids: [],
         decision: 'pending', decision_label: 'undecided', promoted: null, rejection_reason: null,
         scalar_score_delta: null, drift_loss_delta: null, pass_rate_delta: null,
+        source: 'proposer', author: null,
       },
     ],
   }, overrides || {});

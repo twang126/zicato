@@ -2,9 +2,9 @@
 
 | Measurement | Delta |
 |---|---:|
-| Total | +285 |
-| Production | +82 |
-| Production logic | +48 |
+| Total | +340 |
+| Production | +94 |
+| Production logic | +56 |
 
 The index records each candidate's source and its operator author, the
 proposer's experiment memory marks an operator's entry, and the dashboard

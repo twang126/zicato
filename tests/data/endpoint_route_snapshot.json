@@ -4422,7 +4422,7 @@
           "scalar_score_delta": null,
           "drift_loss_delta": null,
           "pass_rate_delta": null,
-          "source": "proposer",
+          "source": null,
           "author": null
         },
         {

@@ -1755,7 +1755,7 @@ enforcing code, and the test that pins it.
 | Channel | Reaches the prompt as | Transformation | Enforcing code | Test |
 |---|---|---|---|---|
 | Detector **patterns** | declared kind, severity, measurements, known metric labels, affected **mutation** ids | typed numeric projection; summaries constructed from permitted fields; diagnostic ids and text omitted; entries counted; findings sorted by rendered content | `render_pattern_block(restrict=True)` → `PatternFeedback.from_pattern` (`src/zicato/proposer/pattern_feedback.py`) | `tests/test_proposer_prompts.py`, `tests/test_proposer_best_of_n.py`; real outputs from every built-in detector |
-| **Experiment memory** | per-experiment verdict + bucketed Δscalar + targeted ids + core idea | `Δscalar=improved/flat/regressed` under restrict; cross-contract entries carry NO delta at all | `_render_prior_experiment_line(restrict=…)`, `_bucket_scalar_delta` | `tests/test_proposer_prior_experiments_block.py` |
+| **Experiment memory** | per-experiment verdict + bucketed Δscalar + targeted ids + core idea + `source:operator` for an operator entry | `Δscalar=improved/flat/regressed` under restrict; cross-contract entries carry NO delta at all | `_render_prior_experiment_line(restrict=…)`, `_bucket_scalar_delta` | `tests/test_proposer_prior_experiments_block.py` |
 | **Failure-mode profile** | banded recall/precision decomposition, banded failure-mode rates, banded pass-rate/score | every number through `band_rate` / `_band_quality`; summary object carries marginal rates only (no id/question/output token) | `render_failure_mode_profile` + `aggregate_outcome_marginals` (`src/zicato/analyzer/outcome_marginals.py`) | `tests/test_outcome_marginals.py`, `tests/test_proposer_prompts.py` |
 | **Operator outcome-marginals hook** | extra named banded rates (`- <name>: ~N% of runs`) | `run_operator_summarizer` sanitizes: numeric-only values, names filtered — the operator hook's output "cannot leak" | `src/zicato/analyzer/outcome_marginals.py::run_operator_summarizer` | `tests/test_outcome_marginals.py` |
 | **Process exemplars** (opt-in) | redacted event windows: relative offsets, case names, allowlisted fields, `task-N` tokens | the four redaction rules (§5.8.3) | `src/zicato/analyzer/process_exemplars.py` | `tests/test_process_exemplars.py` (per-rule adversarial fixtures), `tests/test_process_exemplars_e2e.py` |
@@ -2321,7 +2321,8 @@ of a recombined mint, §5.6.11; empty otherwise), and `operator` (an
 `core_idea`, `modulating`, `decision`
 (`promoted`/`rejected`/`deferred`/`in_flight`), `rejection_reason`,
 `scalar_score_delta` (`None` for in-flight and cross-contract),
-`same_contract`, `prediction_accuracy` (`None` when ungraded).
+`same_contract`, `prediction_accuracy` (`None` when ungraded, and for an
+operator entry), `source` (`"proposer"` or `"operator"`, §5.14a).
 
 ---
 

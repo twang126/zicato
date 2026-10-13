@@ -588,9 +588,11 @@ the holdout is the smaller slice and its scalar moves in coarser steps:
   holdout record saves the count as `holdout_replicates`. Replication
   reduces the noise of the scalar comparison. It does not dilute a failed
   run, because one aborted replicate still marks the entry not completed.
-  Under `per_entry` scope with a zero `holdout_entry_regression_budget`,
-  more draws make pass-rate rejects more frequent, so pair the setting with
-  a budget of at least 1 or with `aggregate` scope.
+  Use the setting only with `aggregate` scope and a
+  `holdout_entry_regression_budget` of at least 1. Under `per_entry` scope,
+  a folded entry score is a fraction, so a small drop on any entry counts as
+  a regression, and more draws make pass-rate rejects more frequent at any
+  budget. Under `aggregate` scope with budget 0 they are also more frequent.
 
 A failed confirmation rejects with a reason that begins
 `"holdout_not_confirmed: "`.

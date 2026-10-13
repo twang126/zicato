@@ -631,12 +631,14 @@ class ScoringWeights:
         holdout slice is small, so one noisy run can decide the scalar
         comparison; replication reduces that noise. It does not dilute a
         failed run: the fold ORs ``not_completed``, so one aborted replicate
-        still charges the entry in full. Under ``per_entry`` pass-rate scope
-        with a zero ``holdout_entry_regression_budget``, more draws make
-        exact ties rarer and so pass-rate rejects more frequent; pair the
-        setting with a budget of at least 1, or with ``aggregate`` scope. The
-        setting has no effect when the duel itself runs one replicate, as
-        the racing structure does by default. The holdout record saves the count as
+        still charges the entry in full. Use it only with ``aggregate``
+        pass-rate scope and a ``holdout_entry_regression_budget`` of at least
+        1. Under ``per_entry`` scope, each folded entry score is a fraction,
+        so a small drop on any entry counts as a regression, and more draws
+        make pass-rate rejects more frequent at any budget. Under
+        ``aggregate`` scope with budget 0 they are also more frequent. The
+        setting has no effect when the duel itself runs one replicate. The
+        holdout record saves the count as
         ``holdout_replicates``, and the cost estimate counts it. It changes
         how a promotion is measured, so it is a contract input: changing it
         rolls the epoch.

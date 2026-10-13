@@ -106,7 +106,13 @@ def _gen(tmp_path: Path, gen_id: str, parent: str | None) -> Generation:
     )
 
 
-def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, holdout_child_drift: float) -> Any:
+def _run(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    holdout_child_drift: float,
+    replicates: int = 1,
+) -> Any:
     board = _board()
     canned: dict[tuple[str, str], LossProfile] = {}
     for e in board[:4]:  # train: champion 2.0 -> challenger 1.0 (clear train win)
@@ -129,6 +135,7 @@ def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, holdout_child_drift
             config=config,
             workspace_root=tmp_path,
             epoch_id=epoch_id,
+            replicates=replicates,
         )
     )
 
@@ -150,9 +157,9 @@ def test_the_manual_tournament_records_its_holdout_replicates(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """``run_tournament`` records how many draws each holdout entry ran."""
-    result = _run(monkeypatch, tmp_path, holdout_child_drift=1.0)
+    result = _run(monkeypatch, tmp_path, holdout_child_drift=1.0, replicates=2)
     assert result.holdout is not None
-    assert result.holdout["holdout_replicates"] == 1
+    assert result.holdout["holdout_replicates"] == 2
 
 
 def test_holdout_confirmation_promotes_and_reports_train_scalar(

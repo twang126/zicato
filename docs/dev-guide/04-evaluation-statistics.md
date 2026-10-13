@@ -898,8 +898,10 @@ reserved, and the budget before and after the decision.
 The concrete keys are `confirmed`, `train_scalar`, `holdout_scalar`,
 `holdout_consulted`, `ladder_released`, `ladder_budget_total`,
 `ladder_budget_before_query`, `ladder_budget_remaining`,
-`ladder_query_reserved`, `threshold`, `confirmation_status`, `reason`, and
-`holdout_replicates` (how many draws each holdout entry ran).
+`ladder_query_reserved`, `threshold`, `confirmation_status`, and `reason`.
+The tournament runner adds `holdout_replicates` (how many draws each holdout
+entry ran) to a block whose holdout ran. The disabled block and the block for
+an exhausted Ladder budget do not have it.
 
 An absent holdout slice produces `confirmation_status=disabled`. A training
 rejection skips its conditional holdout confirmation and has no block. An
@@ -1618,7 +1620,7 @@ the contract hash:
 |---|---|---|
 | `holdout_margin` | `None` | The holdout confirmation's scalar tolerance (`gate.effective_holdout_margin`). `None` ⇒ fall back to `promote_margin`. Scoped to the confirmation only — it does not move the Ladder's release threshold, which gates a *train*-measured improvement. |
 | `holdout_entry_regression_budget` | `0` | How many holdout entries may regress before the confirmation rejects. `0` ⇒ a zero-tolerance rule. Applies under both monotonicity scopes — per-entry as a count, aggregate as a widened `budget / entries` band, so one budget unit means one entry either way. |
-| `replicate_holdout` | `False` | The evolve loop's holdout confirmation (`evolve/gate.py` → `confirm_crowning_holdout`) runs each holdout entry at the crowning duel's replicate count (`_holdout_replicates`) and folds the draws like the train duel's. Off ⇒ one run per entry. The manual `run_tournament` path already uses the duel's count. The holdout block records `holdout_replicates`, and `estimate_cost` counts holdout replicates only when it is on. It reduces scalar noise only: `not_completed` is ORed across draws, and under `per_entry` scope with budget 0 more draws make pass-rate rejects more frequent, so pair it with a budget ≥ 1 or `aggregate` scope. |
+| `replicate_holdout` | `False` | The evolve loop's holdout confirmation (`evolve/gate.py` → `confirm_crowning_holdout`) runs each holdout entry at the crowning duel's replicate count (`_holdout_replicates`) and folds the draws like the train duel's. Off ⇒ one run per entry. The manual `run_tournament` path already uses the duel's count. The holdout block records `holdout_replicates`, and `estimate_cost` counts holdout replicates only when it is on. It reduces scalar noise only: `not_completed` is ORed across draws, and more draws make pass-rate rejects more frequent under `per_entry` scope at any budget and under `aggregate` scope with budget 0. Use it only with `aggregate` scope and a budget ≥ 1. |
 
 For commensurable bounds set `holdout_margin ≈ promote_margin × N_train /
 N_holdout`, roughly double on the default split. The budget follows the gate's

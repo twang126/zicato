@@ -2,8 +2,8 @@
 
 | Measurement | Delta |
 |---|---:|
-| Total | +250 |
-| Production | +54 |
+| Total | +259 |
+| Production | +56 |
 | Production logic | +17 |
 
 `ScoringWeights.replicate_holdout` makes the evolve loop's holdout

@@ -1079,8 +1079,8 @@ per-cell figure is the one that composes with the anchors and with concurrency.
 ≈2,000 s, which gives ≈6.7 h. The **measured** time was **≈7.5 h for both
 sweeps** (run 1 at 7 h 23 m). The
 per-board-run figure is **derived** from the per-cell figure by dividing
-through the **planning** 7-entry shape's 14 board runs per round (14 × 3 ≈ 42
-per cell). The executed board carried **5 entries** with a structurally empty
+through the **planning** 7-entry shape's 14 board runs per round with
+`replicate_holdout` on (14 × 3 ≈ 42 per cell). The executed board carried **5 entries** with a structurally empty
 holdout (R.6), and its meter arithmetic gives fewer board runs per round than
 that.
 **≈48 s is therefore an order-of-magnitude figure against the 0.8 s assumption
@@ -1098,10 +1098,12 @@ shared-control block in §2.3 leaves `replicates` at its default, because §3.4
 shows it is not the sizing lever; set it explicitly only to obtain the
 per-round board-run count that follows.
 `duel runs = field_size·replicates·train = 1·2·5 = 10` and
-`holdout-confirm = holdout·replicates = 2·2 = 4`, giving **14 board runs per
-round**. Screen arms add `proposes·best_of_n·panel = 1·3·min(2,7) = 6`, giving
-**20 per round** — a **+42.9%** premium, which is the quantity the screening
-arm's decision rule prices. `recombine` arms are cost-neutral; `genealogy`,
+`holdout-confirm = holdout = 2`, giving **12 board runs per round**. Screen
+arms add `proposes·best_of_n·panel = 1·3·min(2,7) = 6`, giving **18 per
+round** — a **+50%** premium, which is the quantity the screening arm's
+decision rule prices. With `replicate_holdout` on, `holdout-confirm =
+holdout·replicates = 2·2 = 4`, which gives 14 board runs per round, 20 with
+the screen arms, and a +42.9% premium. `recombine` arms are cost-neutral; `genealogy`,
 `calibration_feedback`, the roles, and `process_exemplars` are read-side and
 leave the cost meter untouched.
 

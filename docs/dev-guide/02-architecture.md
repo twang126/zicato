@@ -972,6 +972,7 @@ journaled verbatim under `OutcomeRecord.holdout`:
 | `holdout_consulted` / `ladder_released` | whether the holdout was queried, and whether the release rule fired |
 | `ladder_budget_total` / `ladder_budget_before_query` / `ladder_budget_remaining` / `ladder_query_reserved` | the per-epoch holdout-query budget accounting |
 | `threshold` | the train-improvement bar the release rule applied |
+| `holdout_replicates` | how many draws each holdout entry ran; only on a block whose holdout ran |
 
 Alongside it, `_generalization_fields_from_scalars`
 (`src/zicato/evolve/decision_support.py`) pairs the crowning challenger's

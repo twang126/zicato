@@ -426,6 +426,23 @@ def test_cost_includes_holdout_confirm_runs() -> None:
     assert any(line.label == "holdout-confirm runs" for line in est.breakdown)
 
 
+@pytest.mark.parametrize(("replicate_holdout", "holdout_runs"), [(False, 2), (True, 6)])
+def test_cost_counts_holdout_replicates_only_when_the_contract_asks(
+    replicate_holdout: bool, holdout_runs: int
+) -> None:
+    import dataclasses
+
+    draft = _gauntlet_draft()
+    draft.entries = _board(12)
+    ops.set_structure(draft, "gauntlet")
+    ops.set_param(draft, "replicates", 3)
+    ops.set_holdout(draft, tags=["e0", "e1"])
+    draft.scoring = dataclasses.replace(draft.scoring, replicate_holdout=replicate_holdout)
+    est = ops.estimate_cost(draft)
+    holdout = next(line for line in est.breakdown if line.label == "holdout-confirm runs")
+    assert holdout.runs == holdout_runs
+
+
 # ---------------------------------------------------------------------------
 # Per-structure default replicates — the under-reporting bug + its anti-drift
 # pin. The cost meter must default ``replicates`` to the STRUCTURE's own

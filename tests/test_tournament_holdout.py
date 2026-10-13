@@ -146,6 +146,15 @@ def test_holdout_regression_flips_a_train_win_to_reject(
     assert result.child_agg["drift_loss_mean"] == pytest.approx(1.0)
 
 
+def test_the_manual_tournament_records_its_holdout_replicates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """``run_tournament`` records how many draws each holdout entry ran."""
+    result = _run(monkeypatch, tmp_path, holdout_child_drift=1.0)
+    assert result.holdout is not None
+    assert result.holdout["holdout_replicates"] == 1
+
+
 def test_holdout_confirmation_promotes_and_reports_train_scalar(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -322,6 +331,7 @@ def _confirm(
     *,
     board: list[BoardEntry],
     holdout_child_drift: float,
+    replicates: int = 1,
 ) -> Any:
     """Drive ``confirm_crowning_holdout`` for a champion-vs-survivor crowning duel."""
     from zicato.tournament.gate import GateOutcome
@@ -355,6 +365,7 @@ def _confirm(
             config=config,
             workspace_root=tmp_path,
             epoch_id=epoch_id,
+            replicates=replicates,
         )
     )
 
@@ -495,3 +506,61 @@ def test_confirm_crowning_holdout_does_not_launch_when_reservation_fails(
                 epoch_id="e0",
             )
         )
+
+
+@pytest.mark.parametrize(("asked", "launched"), [(3, 3), (0, 1)])
+def test_confirm_crowning_holdout_runs_the_holdout_at_the_given_replicates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, asked: int, launched: int
+) -> None:
+    """The holdout matchup gets the replicate count it is handed, never below one."""
+    from zicato.tournament.gate import GateOutcome
+    from zicato.tournament.runner import confirm_crowning_holdout
+
+    class _Stop(Exception):
+        pass
+
+    seen: list[int] = []
+
+    async def record(**kwargs: Any) -> Any:
+        seen.append(kwargs["replicates"])
+        raise _Stop
+
+    monkeypatch.setattr(runner_mod, "run_matchup", record)
+    board = _board()
+    config = runtime_config(tmp_path)
+    weights = ScoringWeights(promote_margin=0.1)
+    epoch_id = prepare_tournament_epoch(tmp_path, config, board, weights)
+    train_outcome = GateOutcome(
+        decision="promoted", reason="", delta_scalar=-1.0, delta_pass_rate=0.0
+    )
+    try:
+        asyncio.run(
+            confirm_crowning_holdout(
+                adapter=object(),
+                champion_gen=replace(_gen(tmp_path, "v0", None), epoch_id=epoch_id),
+                challenger_gen=replace(_gen(tmp_path, "v1", "v0"), epoch_id=epoch_id),
+                board=board,
+                train_outcome=train_outcome,
+                train_parent_agg=_agg(2.0),
+                train_child_agg=_agg(1.0),
+                weights=weights,
+                config=config,
+                workspace_root=tmp_path,
+                epoch_id=epoch_id,
+                replicates=asked,
+            )
+        )
+    except _Stop:
+        pass
+    assert seen == [launched]
+
+
+@pytest.mark.parametrize("replicates", [1, 2])
+def test_confirm_crowning_holdout_records_the_holdout_replicates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, replicates: int
+) -> None:
+    """The holdout record says how many draws each holdout entry ran."""
+    _outcome, block, _scalar = _confirm(
+        monkeypatch, tmp_path, board=_board(), holdout_child_drift=1.0, replicates=replicates
+    )
+    assert block["holdout_replicates"] == replicates

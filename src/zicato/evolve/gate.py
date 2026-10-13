@@ -129,6 +129,18 @@ def _released_holdout_confirmation(block: dict[str, Any] | None) -> bool | None:
     return confirmed if isinstance(confirmed, bool) else None
 
 
+def _holdout_replicates(weights: Any, strategy: Any) -> int:
+    """How many times each holdout entry runs in a crowning confirmation.
+
+    The duel's own replicate count when the contract sets
+    :attr:`~zicato.core.ScoringWeights.replicate_holdout`, otherwise one run
+    per entry. The manual ``zicato tournament`` command always runs its
+    holdout at the duel's count. The evolve loop runs it once per entry
+    unless the contract asks.
+    """
+    return strategy.replicates() if weights.replicate_holdout else 1
+
+
 async def _confirm_crowning_on_holdout(
     *,
     decision: Any,
@@ -146,6 +158,7 @@ async def _confirm_crowning_on_holdout(
     fast_mode: bool,
     confirm_fn: Any,
     writer: WorkspaceLock | None = None,
+    replicates: int = 1,
 ) -> _CrowningHoldout:
     """Confirm a field's crowning train-promote on the holdout slice.
 
@@ -165,6 +178,9 @@ async def _confirm_crowning_on_holdout(
     challenger's TRAIN-slice scalar is paired with its holdout-slice scalar
     so the generalization gap is measured on the SAME crowning duel
     (mirroring the gauntlet).
+
+    ``replicates`` is how many times each holdout entry runs, folded like the
+    train duel's replicates. The caller passes :func:`_holdout_replicates`.
     """
     promoted_id = decision.promoted_generation_id
     crowning_result = (
@@ -213,6 +229,7 @@ async def _confirm_crowning_on_holdout(
         epoch_id=epoch_id,
         disable_drift=disable_drift,
         judge_only=judge_only,
+        replicates=replicates,
         fast=fast_mode,
     )
     reason_override: str | None = None
@@ -425,6 +442,7 @@ async def resolve_field_verdict(
         fast_mode=prepared.fast_mode,
         confirm_fn=confirm_crowning_holdout,
         writer=prepared.writer,
+        replicates=_holdout_replicates(prepared.weights, prepared.strategy),
     )
     promoted_id = crowning.promoted_id
     reason_override = crowning.reason_override

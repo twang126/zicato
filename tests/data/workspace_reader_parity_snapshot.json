@@ -766,6 +766,7 @@
         "-q"
       ],
       "regression_timeout_s": 600,
+      "replicate_holdout": false,
       "scalar_fn": "",
       "severity_weights": {
         "critical": 10.0,
@@ -2210,6 +2211,7 @@
         "-q"
       ],
       "regression_timeout_s": 600,
+      "replicate_holdout": false,
       "scalar_fn": "",
       "severity_weights": {
         "critical": 10.0,
@@ -10325,6 +10327,7 @@
         "-q"
       ],
       "regression_timeout_s": 600,
+      "replicate_holdout": false,
       "scalar_fn": "",
       "severity_weights": {
         "critical": 10.0,
@@ -10439,6 +10442,7 @@
         "-q"
       ],
       "regression_timeout_s": 600,
+      "replicate_holdout": false,
       "scalar_fn": "",
       "severity_weights": {
         "critical": 10.0,

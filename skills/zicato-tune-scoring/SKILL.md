@@ -349,6 +349,7 @@ contract hash:
 |---|---|---|
 | `holdout_margin` | `None` (= `promote_margin`) | holdout confirmations reject on movement the slice cannot avoid. Rule of thumb for commensurable bounds: `promote_margin × N_train / N_holdout`, roughly double on the default split. |
 | `holdout_entry_regression_budget` | `0` (zero tolerance) | a single holdout entry flipping pass→fail is rejecting every candidate. At `0` that rejects at EVERY margin — no `holdout_margin` can fix it, because the pass-rate rule fires before any scalar bound. Set `1` to let the confirmation absorb one entry. |
+| `replicate_holdout` | `false` | noise in single holdout runs decides the holdout scalar comparison. On, the evolve loop runs each holdout entry at the duel's replicate count; it costs `holdout × (replicates − 1)` more runs per crowning round. Set `holdout_entry_regression_budget` ≥ 1 (or use `aggregate` scope) with it: under `per_entry` scope with budget 0, more draws make pass-rate rejects MORE frequent. It does not help against failed runs, which still charge in full. No effect when the duel runs one replicate. |
 
 The TRAIN side keeps its zero-tolerance rule either way, so neither knob
 loosens the gate's primary decision.

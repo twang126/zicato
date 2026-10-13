@@ -20,7 +20,10 @@ the tests here pin their exact semantics directly.
 from __future__ import annotations
 
 import asyncio
+import types
 from typing import Any
+
+import pytest
 
 import zicato.evolve.gate as gate
 import zicato.evolve.propose_apply as propose_apply
@@ -297,6 +300,7 @@ class TestConfirmCrowningOnHoldout:
         decision: SelectionDecision,
         confirm_fn: Any,
         tmp_path: Any,
+        **extra: Any,
     ) -> gate._CrowningHoldout:
         gens = {gid: _gen(gid) for gid in ("v0", "v2")}
         return asyncio.run(
@@ -315,8 +319,36 @@ class TestConfirmCrowningOnHoldout:
                 judge_only=False,
                 fast_mode=False,
                 confirm_fn=confirm_fn,
+                **extra,
             )
         )
+
+    def _promoting_confirm(self, seen: list[Any]) -> Any:
+        async def _confirm(**kwargs: Any) -> Any:
+            seen.append(kwargs)
+            outcome = GateOutcome(
+                decision=TournamentDecision.PROMOTED,
+                reason="",
+                delta_scalar=-2.0,
+                delta_pass_rate=0.0,
+            )
+            return outcome, {"consulted": True}, 1.25
+
+        return _confirm
+
+    def test_holdout_runs_once_per_entry_by_default(self, tmp_path: Any) -> None:
+        seen: list[Any] = []
+        matchups = (_matchup("v0", "v2", 3.0, 1.0),)
+        decision = _decision("v2", matchups=matchups, crowning="v0:v2")
+        self._run(decision, self._promoting_confirm(seen), tmp_path)
+        assert seen[0]["replicates"] == 1
+
+    def test_holdout_gets_the_replicate_count_it_is_handed(self, tmp_path: Any) -> None:
+        seen: list[Any] = []
+        matchups = (_matchup("v0", "v2", 3.0, 1.0),)
+        decision = _decision("v2", matchups=matchups, crowning="v0:v2")
+        self._run(decision, self._promoting_confirm(seen), tmp_path, replicates=3)
+        assert seen[0]["replicates"] == 3
 
     def test_pass_through_without_crowning_duel(self, tmp_path: Any) -> None:
         calls: list[Any] = []
@@ -441,3 +473,67 @@ class TestReleasedHoldoutConfirmation:
             )
             is None
         )
+
+
+class TestHoldoutReplicates:
+    """The holdout replicate count comes from the contract's ``replicate_holdout``."""
+
+    @staticmethod
+    def _contract(replicate_holdout: bool) -> Any:
+        from zicato.workspace_loader import scoring_weights_from_dict
+
+        return scoring_weights_from_dict(
+            {
+                "replicate_holdout": replicate_holdout,
+                "tournament": {"structure": "gauntlet", "params": {"replicates": 3}},
+            }
+        )
+
+    @staticmethod
+    def _strategy(weights: Any) -> Any:
+        from zicato.selection.registry import make_strategy
+
+        return make_strategy(weights.tournament_structure)
+
+    def test_one_run_per_entry_when_off(self) -> None:
+        weights = self._contract(False)
+        assert gate._holdout_replicates(weights, self._strategy(weights)) == 1
+
+    def test_the_duel_count_when_on(self) -> None:
+        weights = self._contract(True)
+        assert gate._holdout_replicates(weights, self._strategy(weights)) == 3
+
+    def test_resolve_field_verdict_hands_the_count_to_the_holdout(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The production path: a loaded contract's count reaches the confirmation."""
+
+        class _Stop(Exception):
+            pass
+
+        seen: list[int] = []
+
+        async def record(**kwargs: Any) -> Any:
+            seen.append(kwargs["replicates"])
+            raise _Stop
+
+        monkeypatch.setattr(gate, "_confirm_crowning_on_holdout", record)
+        weights = self._contract(True)
+        prepared = types.SimpleNamespace(
+            adapter=object(),
+            board=(),
+            weights=weights,
+            config=object(),
+            workspace_root=None,
+            epoch_id="e0",
+            disable_drift=False,
+            judge_only=False,
+            fast_mode=False,
+            writer=None,
+            strategy=self._strategy(weights),
+        )
+        field_round = types.SimpleNamespace(prepared=prepared, parent_id="v0")
+        candidates = types.SimpleNamespace(champion=None, generation=lambda _gid: None)
+        with pytest.raises(_Stop):
+            asyncio.run(gate.resolve_field_verdict(field_round, candidates, object()))
+        assert seen == [3]

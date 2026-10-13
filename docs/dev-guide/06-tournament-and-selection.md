@@ -1303,7 +1303,8 @@ A strategy resolves a leader on the train slice and identifies the final
 champion-gate duel against the reigning champion. This function adds the
 shared Ladder-mediated confirmation. It splits the board, atomically reserves
 one query in the shared epoch-local `LadderState`, and then runs one extra duel
-with `board_subset=holdout_ids`. `_ladder_mediated_outcome` publishes the
+with `board_subset=holdout_ids`, at `replicates` draws per entry (1 unless the
+contract sets `replicate_holdout`, then the duel's count). `_ladder_mediated_outcome` publishes the
 release decision after the duel. An empty holdout preserves the training
 outcome with an explicit disabled record. An exhausted budget defers promotion
 with an unconsulted incomplete record and launches no duel. A withheld or

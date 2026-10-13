@@ -56,6 +56,7 @@
           "confirmation_status": "satisfied",
           "confirmed": true,
           "holdout_consulted": true,
+          "holdout_replicates": 1,
           "holdout_scalar": 0.4,
           "ladder_budget_before_query": 16,
           "ladder_budget_remaining": 15,
@@ -2476,7 +2477,7 @@
     "0/round_log.jsonl": [
       {
         "payload": {
-          "contract_hash": "cf71596230815a167594d20b305e7d23e529ac38857155b72deef3ddd12a855d"
+          "contract_hash": "e78a3c02857c3770f9915e18c535147769d7c5baaedf8561047214d13f8d8c0c"
         },
         "scope": {},
         "seq": 1,

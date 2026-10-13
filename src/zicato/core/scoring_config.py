@@ -624,6 +624,22 @@ class ScoringWeights:
         would produce on that slice. Holdout-only: the train side keeps
         zero tolerance, so this cannot loosen the gate's primary decision.
         Must be ``>= 0``.
+    replicate_holdout:
+        When on, the evolve loop's holdout confirmation runs each holdout
+        entry at the crowning duel's replicate count and folds the draws, as
+        the train duel does. Off (default) runs each holdout entry once. A
+        holdout slice is small, so one noisy run can decide the scalar
+        comparison; replication reduces that noise. It does not dilute a
+        failed run: the fold ORs ``not_completed``, so one aborted replicate
+        still charges the entry in full. Under ``per_entry`` pass-rate scope
+        with a zero ``holdout_entry_regression_budget``, more draws make
+        exact ties rarer and so pass-rate rejects more frequent; pair the
+        setting with a budget of at least 1, or with ``aggregate`` scope. The
+        setting has no effect when the duel itself runs one replicate, as
+        the racing structure does by default. The holdout record saves the count as
+        ``holdout_replicates``, and the cost estimate counts it. It changes
+        how a promotion is measured, so it is a contract input: changing it
+        rolls the epoch.
     pass_rate_monotonicity:
         When on (default), a pass-rate regression rejects the challenger
         whatever the drift-side improvement: every expectation the
@@ -798,6 +814,7 @@ class ScoringWeights:
         default=0,
         metadata=_knob(constraint=KnobConstraint(minimum=0)),
     )
+    replicate_holdout: bool = field(default=False, metadata=_knob())
     pass_rate_monotonicity: bool = field(
         default=True,
         metadata=_knob(),

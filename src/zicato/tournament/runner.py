@@ -510,6 +510,7 @@ async def run_tournament(
                         epoch_id=epoch_id,
                         reservation=reservation,
                     )
+                    holdout_block = _with_holdout_replicates(holdout_block, replicates)
         finally:
             if rt is not None:
                 state_mod, _ = rt
@@ -1013,6 +1014,15 @@ async def run_matchup(
         )
 
 
+def _with_holdout_replicates(
+    block: dict[str, Any] | None, replicates: int
+) -> dict[str, Any] | None:
+    """Add how many draws each holdout entry ran, so the record says how it was measured."""
+    if block is None:
+        return None
+    return {**block, "holdout_replicates": max(1, replicates)}
+
+
 @with_workspace_imports
 async def confirm_crowning_holdout(
     *,
@@ -1031,6 +1041,7 @@ async def confirm_crowning_holdout(
     judge_only: bool = False,
     fast: bool = False,
     writer: WorkspaceLock | None = None,
+    replicates: int = 1,
 ) -> tuple[GateOutcome, dict[str, Any] | None, float | None]:
     """Confirm the crowning training duel on the contract's holdout slice.
 
@@ -1039,6 +1050,9 @@ async def confirm_crowning_holdout(
     reserves a query before executing the holdout matchup and settles its
     release decision. Exhausted allowance, withholding, or incomplete execution
     defers promotion; a released negative result rejects it.
+
+    ``replicates`` is how many draws each holdout entry runs. The draws fold
+    like a train duel's replicates, and a value below one runs once.
 
     Returns the final gate outcome, its holdout record, and the challenger's
     observed holdout scalar (or ``None`` when no complete measurement exists).
@@ -1087,6 +1101,7 @@ async def confirm_crowning_holdout(
             workspace_root=workspace_root,
             epoch_id=epoch_id,
             board_subset=tuple(holdout_ids),
+            replicates=max(1, replicates),
             disable_drift=disable_drift,
             judge_only=judge_only,
             fast=fast,
@@ -1106,6 +1121,7 @@ async def confirm_crowning_holdout(
             epoch_id=epoch_id,
             reservation=reservation,
         )
+        holdout_block = _with_holdout_replicates(holdout_block, replicates)
         holdout_child_scalar = (
             None
             if holdout_child_agg.get("incomplete_entries")

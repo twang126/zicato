@@ -99,6 +99,7 @@ _NONDEFAULT_VALUES: dict[str, dict[str, Any]] = {
         "promote_margin": 0.05,
         "holdout_margin": 0.11,
         "holdout_entry_regression_budget": 2,
+        "replicate_holdout": True,
         "pass_rate_monotonicity": False,
         "pass_rate_monotonicity_scope": "aggregate",
         "regression_gate_enabled": True,

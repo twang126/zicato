@@ -581,6 +581,16 @@ the holdout is the smaller slice and its scalar moves in coarser steps:
   regress under the pass-rate rule before confirmation fails. `0` (the
   default) tolerates none. Under `aggregate` scope the budget widens the
   mean-score tolerance by the movement that many entries produce.
+- `replicate_holdout` — when on, the evolve loop runs each holdout entry
+  at the crowning duel's replicate count and folds the draws like the train
+  duel's. Off (the default) runs each holdout entry once; the
+  manual `zicato tournament` command already uses the duel's count. The
+  holdout record saves the count as `holdout_replicates`. Replication
+  reduces the noise of the scalar comparison. It does not dilute a failed
+  run, because one aborted replicate still marks the entry not completed.
+  Under `per_entry` scope with a zero `holdout_entry_regression_budget`,
+  more draws make pass-rate rejects more frequent, so pair the setting with
+  a budget of at least 1 or with `aggregate` scope.
 
 A failed confirmation rejects with a reason that begins
 `"holdout_not_confirmed: "`.

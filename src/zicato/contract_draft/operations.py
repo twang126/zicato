@@ -1037,13 +1037,16 @@ def estimate_cost(draft: TournamentDraft) -> CostEstimate:
         per_round, racing_lines = _racing_cost(strategy, board_size)
         lines.extend(racing_lines)
 
-    holdout_confirm = holdout_size * replicates
+    # The evolve loop runs each holdout entry once unless the contract sets
+    # `replicate_holdout`.
+    holdout_replicates = replicates if draft.scoring.replicate_holdout else 1
+    holdout_confirm = holdout_size * holdout_replicates
     if holdout_confirm:
         lines.append(
             CostLine(
                 "holdout-confirm runs",
                 holdout_confirm,
-                f"holdout {holdout_size} × replicates {replicates}",
+                f"holdout {holdout_size} × replicates {holdout_replicates}",
             )
         )
         per_round += holdout_confirm

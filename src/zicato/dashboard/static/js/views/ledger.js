@@ -98,7 +98,7 @@ function ledgerRow(r, epochId, o) {
     cells: [
       { class: 'dn-num dn-mono', text: svg.isNum(r.round_index) ? String(r.round_index) : '—' },
       { class: 'dn-mono', el: genCell(gen, r, o) },
-      { class: 'dn-ledger-ideacell', el: ideaCell(r.core_idea, epochId, gen) },
+      { class: 'dn-ledger-ideacell', el: withSourceCaption(ideaCell(r.core_idea, epochId, gen), r) },
       { class: 'dn-ledger-sites', el: sitesCell(r.mutation_ids) },
       { el: verdictLabel(decision, { live, label: r.decision_label }) },
       deltaCell(delta, { base: 'dn-num dn-mono', text: delta == null ? '—' : svg.fmtSigned(delta, 3) }),
@@ -147,6 +147,18 @@ function ideaCell(rawIdea, epochId, gen) {
   return btn;
 }
 
+// An operator's candidate carries one faint caption line under its idea,
+// naming its author; a proposer's row is unchanged. Metadata is a caption,
+// never a tag (09-dashboard-and-query.md §9.7.7).
+function withSourceCaption(idea, r) {
+  if (r.source !== 'operator') return idea;
+  const author = (typeof r.author === 'string' && r.author) ? r.author : null;
+  return el('div', null, [
+    idea,
+    el('div', { class: 'dn-ledger-source dn-faint', text: 'operator' + (author ? ' · ' + author : '') }),
+  ]);
+}
+
 // The sites this experiment touched: the first few mutation ids, then a
 // "+N more" carrying the rest on hover. A proposal that patched nothing
 // recorded reads '—'.
@@ -182,6 +194,7 @@ export function ledgerDigest(ledger) {
       r.decision || null, r.promoted === true ? 1 : (r.promoted === false ? 0 : null),
       svg.isNum(r.scalar_score_delta) ? r.scalar_score_delta.toFixed(3) : null,
       (r.rejection_reason || '').slice(0, 120),
+      r.source === 'operator' ? ['operator', r.author || null] : null,
     ]),
   ];
 }

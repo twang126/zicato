@@ -691,3 +691,64 @@ def test_a_store_failure_while_minting_rejects_the_item_and_the_loop_continues(
     assert _pending_queue_ids(workspace) == []
     (reason,) = _audit_reasons(workspace)
     assert "the store failed" in reason
+
+
+# ---------------------------------------------------------------------------
+# The index, the proposer's memory, and the dashboard views
+# ---------------------------------------------------------------------------
+
+
+def test_the_index_ledger_epoch_view_and_memory_name_the_operator(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A settled operator round reaches every reader that tells the sources apart."""
+    from zicato.index.query import prior_experiments_for_epoch
+    from zicato.query import WorkspacePaths, build_epoch_view, build_experiments_ledger
+
+    workspace, epoch_id = _bootstrap_swiss_workspace(tmp_path, field_size=2)
+    enqueue_operator_round(workspace, _round(epoch_id))
+    install_stub_adapter_factory(monkeypatch)
+    install_telemetry_stubs(
+        monkeypatch,
+        canned_loss_by_gen={"v0": 2.0, "v1": 0.5, "v2": 1.5},
+        canned_pass_by_gen={"v0": True, "v1": True, "v2": True},
+    )
+    run_evolve_once(workspace, epoch_id, evaluation_call_llm)
+
+    memory = {
+        pe.generation_id: pe.source
+        for pe in prior_experiments_for_epoch(workspace / "index.db", epoch_id)
+    }
+    assert memory == {"v1": "operator", "v2": "proposer"}
+
+    paths = WorkspacePaths(workspace)
+    rows = {r["generation_id"]: r for r in build_experiments_ledger(paths, epoch_id)["experiments"]}
+    assert (rows["v1"]["source"], rows["v1"]["author"]) == ("operator", "alice")
+    assert (rows["v2"]["source"], rows["v2"]["author"]) == ("proposer", None)
+    assert build_epoch_view(paths, epoch_id)["operator_candidate_count"] == 1
+
+
+def test_an_operator_memory_line_is_marked_and_has_no_prediction_band() -> None:
+    """The band grades the proposer's own predictions, so an operator line omits it."""
+    from zicato.core.experiment import PriorExperiment
+    from zicato.proposer.prompts import render_prior_experiments_block
+
+    def entry(generation_id: str, source: Any) -> PriorExperiment:
+        return PriorExperiment(
+            generation_id=generation_id,
+            epoch_id="e1",
+            core_idea="Greet with more warmth",
+            modulating=("greeting",),
+            decision="promoted",
+            rejection_reason="",
+            scalar_score_delta=-0.2,
+            prediction_accuracy=1.0,
+            source=source,
+        )
+
+    block = render_prior_experiments_block([entry("v1", "operator"), entry("v2", "proposer")])
+    operator_line = next(line for line in block.splitlines() if line.startswith("- v1"))
+    proposer_line = next(line for line in block.splitlines() if line.startswith("- v2"))
+    assert operator_line.endswith("source:operator")
+    assert "prediction:" not in operator_line
+    assert proposer_line.endswith("prediction:high")

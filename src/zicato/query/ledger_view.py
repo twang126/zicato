@@ -170,6 +170,10 @@ def _ledger_rows(conn: sqlite3.Connection, epoch_id: str) -> list[dict[str, Any]
                 "scalar_score_delta": _opt_float(row["scalar_score_delta"]),
                 "drift_loss_delta": _opt_float(row["drift_loss_delta"]),
                 "pass_rate_delta": _opt_float(row["pass_rate_delta"]),
+                # "operator" for a candidate `zicato proposer submit` queued,
+                # with its author; "proposer" (author null) otherwise.
+                "source": "operator" if row["source"] == "operator" else "proposer",
+                "author": _opt_text(row["author"]),
             }
         )
 

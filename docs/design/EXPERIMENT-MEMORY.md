@@ -210,6 +210,7 @@ experiments` statement) carries, per `(epoch_id, generation_id)`:
 | `rejection_reason` | the symbolic reason when rejected |
 | `scalar_score_delta` | the Δ-scalar (sign gates promotion) |
 | `drift_loss_delta`, `pass_rate_delta` | secondary deltas, available for richer renders |
+| `source` | `"operator"` marks an operator's candidate in the render; `"proposer"` otherwise |
 
 The targeted mutation-point ids come from the `modulating` array inside
 `hypothesis_json` (decoded), which is the proposer's own declaration of
@@ -334,6 +335,11 @@ Proposed this round, not yet evaluated (diversify away from these):
 - v8 IN-FLIGHT  [researcher.instruction]
     Tighten the researcher instruction to forbid uncited claims.
 ```
+
+An entry from an operator's candidate (queued by `zicato proposer submit`)
+ends its first line with `source:operator` in place of the `prediction:`
+band. The band grades how the proposer's OWN predictions held, so an
+operator's predictions never enter it.
 
 The framing line reads **"Avoid repeating failures; build on wins."**
 rather than "only do X". The section advises; it does not constrain. The

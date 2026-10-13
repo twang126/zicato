@@ -937,6 +937,7 @@
     "holdout": null,
     "journal": "",
     "mutations": [],
+    "operator_candidate_count": 0,
     "scoring": {
       "pass_weight": 1.0,
       "tournament": {
@@ -1116,6 +1117,7 @@
     "holdout": null,
     "journal": "## v1 — hyp e1 v1\n\n**proposed_at**: 2026-01-01T00:00:00Z\n**modulating**: (none)\n**outcome**: rejected (Δscalar=+0.020, Δdrift_loss=+0.000, Δpass_rate=+0.000)\n",
     "mutations": [],
+    "operator_candidate_count": 0,
     "scoring": {
       "pass_weight": 1.0,
       "tournament": {
@@ -1196,6 +1198,7 @@
     "holdout": null,
     "journal": "",
     "mutations": [],
+    "operator_candidate_count": 0,
     "scoring": {
       "pass_weight": 1.0,
       "tournament": {
@@ -2421,6 +2424,7 @@
       "holdout": null,
       "journal": "",
       "mutations": [],
+      "operator_candidate_count": 0,
       "scoring": {
         "pass_weight": 1.0,
         "tournament": {

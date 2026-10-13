@@ -7124,6 +7124,7 @@
   ],
   "zicato.index.experiments_for_epoch::e10": [
     {
+      "author": null,
       "drift_loss_delta": null,
       "epoch_id": "e10",
       "generation_id": "v0",
@@ -7134,9 +7135,11 @@
       "pass_rate_delta": null,
       "rejection_reason": null,
       "scalar_score_delta": null,
+      "source": "proposer",
       "tournament_decision": null
     },
     {
+      "author": null,
       "drift_loss_delta": -0.02,
       "epoch_id": "e10",
       "generation_id": "v1",
@@ -7147,11 +7150,13 @@
       "pass_rate_delta": 0.01,
       "rejection_reason": "",
       "scalar_score_delta": -0.02,
+      "source": "proposer",
       "tournament_decision": "promoted"
     }
   ],
   "zicato.index.experiments_for_epoch::e2": [
     {
+      "author": null,
       "drift_loss_delta": null,
       "epoch_id": "e2",
       "generation_id": "v0",
@@ -7162,9 +7167,11 @@
       "pass_rate_delta": null,
       "rejection_reason": null,
       "scalar_score_delta": null,
+      "source": "proposer",
       "tournament_decision": null
     },
     {
+      "author": null,
       "drift_loss_delta": -0.02,
       "epoch_id": "e2",
       "generation_id": "v1",
@@ -7175,9 +7182,11 @@
       "pass_rate_delta": 0.01,
       "rejection_reason": "",
       "scalar_score_delta": -0.02,
+      "source": "proposer",
       "tournament_decision": "promoted"
     },
     {
+      "author": null,
       "drift_loss_delta": -0.2,
       "epoch_id": "e2",
       "generation_id": "v10",
@@ -7188,9 +7197,11 @@
       "pass_rate_delta": 0.1,
       "rejection_reason": "",
       "scalar_score_delta": -0.02,
+      "source": "proposer",
       "tournament_decision": "promoted"
     },
     {
+      "author": null,
       "drift_loss_delta": -0.04,
       "epoch_id": "e2",
       "generation_id": "v2",
@@ -7201,9 +7212,11 @@
       "pass_rate_delta": 0.02,
       "rejection_reason": "below promote margin",
       "scalar_score_delta": 0.005,
+      "source": "proposer",
       "tournament_decision": "rejected"
     },
     {
+      "author": null,
       "drift_loss_delta": -0.06,
       "epoch_id": "e2",
       "generation_id": "v3",
@@ -7214,9 +7227,11 @@
       "pass_rate_delta": 0.03,
       "rejection_reason": "below promote margin",
       "scalar_score_delta": 0.005,
+      "source": "proposer",
       "tournament_decision": "rejected"
     },
     {
+      "author": null,
       "drift_loss_delta": -0.08,
       "epoch_id": "e2",
       "generation_id": "v4",
@@ -7227,9 +7242,11 @@
       "pass_rate_delta": 0.04,
       "rejection_reason": "",
       "scalar_score_delta": -0.02,
+      "source": "proposer",
       "tournament_decision": "promoted"
     },
     {
+      "author": null,
       "drift_loss_delta": -0.1,
       "epoch_id": "e2",
       "generation_id": "v5",
@@ -7240,9 +7257,11 @@
       "pass_rate_delta": 0.05,
       "rejection_reason": "below promote margin",
       "scalar_score_delta": 0.005,
+      "source": "proposer",
       "tournament_decision": "rejected"
     },
     {
+      "author": null,
       "drift_loss_delta": -0.12,
       "epoch_id": "e2",
       "generation_id": "v6",
@@ -7253,9 +7272,11 @@
       "pass_rate_delta": 0.06,
       "rejection_reason": "below promote margin",
       "scalar_score_delta": 0.005,
+      "source": "proposer",
       "tournament_decision": "deferred"
     },
     {
+      "author": null,
       "drift_loss_delta": -0.14,
       "epoch_id": "e2",
       "generation_id": "v7",
@@ -7266,9 +7287,11 @@
       "pass_rate_delta": 0.07,
       "rejection_reason": "",
       "scalar_score_delta": -0.02,
+      "source": "proposer",
       "tournament_decision": "promoted"
     },
     {
+      "author": null,
       "drift_loss_delta": -0.16,
       "epoch_id": "e2",
       "generation_id": "v8",
@@ -7279,9 +7302,11 @@
       "pass_rate_delta": 0.08,
       "rejection_reason": "below promote margin",
       "scalar_score_delta": 0.005,
+      "source": "proposer",
       "tournament_decision": "rejected"
     },
     {
+      "author": null,
       "drift_loss_delta": -0.18,
       "epoch_id": "e2",
       "generation_id": "v9",
@@ -7292,6 +7317,7 @@
       "pass_rate_delta": 0.09,
       "rejection_reason": "below promote margin",
       "scalar_score_delta": 0.005,
+      "source": "proposer",
       "tournament_decision": "rejected"
     }
   ],
@@ -7771,7 +7797,8 @@
       "prediction_accuracy": 0.5,
       "rejection_reason": "",
       "same_contract": true,
-      "scalar_score_delta": -0.02
+      "scalar_score_delta": -0.02,
+      "source": "proposer"
     }
   ],
   "zicato.index.prior_experiments_for_epoch::e2": [
@@ -7786,7 +7813,8 @@
       "prediction_accuracy": 1.0,
       "rejection_reason": "",
       "same_contract": true,
-      "scalar_score_delta": -0.02
+      "scalar_score_delta": -0.02,
+      "source": "proposer"
     },
     {
       "core_idea": "Rewrite the planner instruction block for round 4.",
@@ -7799,7 +7827,8 @@
       "prediction_accuracy": 1.0,
       "rejection_reason": "",
       "same_contract": true,
-      "scalar_score_delta": -0.02
+      "scalar_score_delta": -0.02,
+      "source": "proposer"
     },
     {
       "core_idea": "Rewrite the planner instruction block for round 10.",
@@ -7812,7 +7841,8 @@
       "prediction_accuracy": 1.0,
       "rejection_reason": "",
       "same_contract": true,
-      "scalar_score_delta": -0.02
+      "scalar_score_delta": -0.02,
+      "source": "proposer"
     },
     {
       "core_idea": "Rewrite the planner instruction block for round 1.",
@@ -7825,7 +7855,8 @@
       "prediction_accuracy": 1.0,
       "rejection_reason": "",
       "same_contract": true,
-      "scalar_score_delta": -0.02
+      "scalar_score_delta": -0.02,
+      "source": "proposer"
     },
     {
       "core_idea": "Rewrite the planner instruction block for round 9.",
@@ -7838,7 +7869,8 @@
       "prediction_accuracy": 1.0,
       "rejection_reason": "below promote margin",
       "same_contract": true,
-      "scalar_score_delta": 0.005
+      "scalar_score_delta": 0.005,
+      "source": "proposer"
     },
     {
       "core_idea": "Rewrite the planner instruction block for round 8.",
@@ -7851,7 +7883,8 @@
       "prediction_accuracy": 1.0,
       "rejection_reason": "below promote margin",
       "same_contract": true,
-      "scalar_score_delta": 0.005
+      "scalar_score_delta": 0.005,
+      "source": "proposer"
     },
     {
       "core_idea": "Rewrite the planner instruction block for round 5.",
@@ -7864,7 +7897,8 @@
       "prediction_accuracy": 1.0,
       "rejection_reason": "below promote margin",
       "same_contract": true,
-      "scalar_score_delta": 0.005
+      "scalar_score_delta": 0.005,
+      "source": "proposer"
     },
     {
       "core_idea": "Rewrite the planner instruction block for round 3.",
@@ -7877,7 +7911,8 @@
       "prediction_accuracy": 1.0,
       "rejection_reason": "below promote margin",
       "same_contract": true,
-      "scalar_score_delta": 0.005
+      "scalar_score_delta": 0.005,
+      "source": "proposer"
     },
     {
       "core_idea": "Rewrite the planner instruction block for round 2.",
@@ -7890,7 +7925,8 @@
       "prediction_accuracy": 1.0,
       "rejection_reason": "below promote margin",
       "same_contract": true,
-      "scalar_score_delta": 0.005
+      "scalar_score_delta": 0.005,
+      "source": "proposer"
     },
     {
       "core_idea": "Rewrite the planner instruction block for round 6.",
@@ -7903,7 +7939,8 @@
       "prediction_accuracy": 1.0,
       "rejection_reason": "below promote margin",
       "same_contract": true,
-      "scalar_score_delta": 0.005
+      "scalar_score_delta": 0.005,
+      "source": "proposer"
     }
   ],
   "zicato.index.reflection_row::r-10": {

@@ -599,6 +599,16 @@ export function buildProposalModel(exp) {
     if (typeof content === 'string' && content) newLines += content.split('\n').length;
   }
 
+  // An operator's candidate (`zicato proposer submit`) records who wrote it,
+  // the generation they edited, and the points where it takes back a
+  // promotion that came after that generation.
+  const op = (exp.operator && typeof exp.operator === 'object') ? exp.operator : null;
+  const operator = op ? {
+    author: text(op.author),
+    basedOn: text(op.based_on),
+    revertedPoints: list(op.reverted_points).map(String).filter(Boolean),
+  } : null;
+
   const model = {
     coreIdea: text(hyp.core_idea),
     why: text(hyp.why),
@@ -608,6 +618,7 @@ export function buildProposalModel(exp) {
     sites,
     patchCount: patchIds.length,
     newLines,
+    operator,
   };
   if (!model.coreIdea && !model.why && !movements.length && !sites.length) return null;
   return model;
@@ -621,6 +632,8 @@ export function proposalHeader(model, opts) {
   const card = el('div', { class: 'dn-panel dn-proposal' });
 
   card.appendChild(el('div', { class: 'dn-proposal-idea', text: model.coreIdea || '(no core idea recorded)' }));
+  const source = operatorCaption(model.operator);
+  if (source) card.appendChild(source);
   if (model.why) card.appendChild(el('p', { class: 'dn-proposal-why', text: model.why }));
 
   // the falsifiable claims, in the prediction scorecard's OWN arrow grammar so
@@ -762,6 +775,20 @@ export function verdictSentenceEl(explain) {
   return el('p', { class: 'dn-verdictline' + tone, text });
 }
 
+// One faint caption line for an operator's candidate: who wrote it, the
+// generation they edited, and any promoted change it takes back. A
+// proposer's candidate has none (09-dashboard-and-query.md §9.7.7: metadata
+// is a caption line, never a tag).
+function operatorCaption(operator) {
+  if (!operator) return null;
+  const bits = ['submitted by an operator' + (operator.author ? ' · ' + operator.author : '')];
+  if (operator.basedOn) bits.push('edited ' + operator.basedOn);
+  if (operator.revertedPoints.length) {
+    bits.push('takes back the promoted change at ' + operator.revertedPoints.join(', '));
+  }
+  return el('p', { class: 'dn-proposal-source dn-faint', text: bits.join(' · ') });
+}
+
 // Digest fold for the proposal header: the words + claims + sites that reach
 // the DOM. null (no proposal) contributes nothing — a seed's dossier digest is
 // byte-identical to the pre-feature path.
@@ -773,6 +800,7 @@ export function proposalDigest(model) {
     model.movements.map((m) => [m.target, m.kind, m.direction, m.magnitude]),
     model.sites.map((s) => [s.mutation_id, s.op]),
     model.patchCount, model.newLines,
+    model.operator ? [model.operator.author, model.operator.basedOn, model.operator.revertedPoints] : null,
   ];
 }
 

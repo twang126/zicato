@@ -19,7 +19,7 @@ import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from zicato.core.types import EXPERIMENT_MEMORY_MAX_ENTRIES, PriorExperiment
 from zicato.index.schema import IndexSchemaError, read_schema_version, require_schema
@@ -283,7 +283,7 @@ def experiments_for_epoch(db_path: Path, epoch_id: str) -> list[sqlite3.Row]:
         db_path,
         "SELECT epoch_id, generation_id, hypothesis_core_idea, hypothesis_why, "
         "hypothesis_json, tournament_decision, rejection_reason, scalar_score_delta, "
-        "drift_loss_delta, pass_rate_delta, outcome_json FROM experiments "
+        "drift_loss_delta, pass_rate_delta, outcome_json, source, author FROM experiments "
         "WHERE epoch_id = ? ORDER BY generation_id",
         (epoch_id,),
     )
@@ -397,6 +397,11 @@ def _row_value(row: sqlite3.Row, key: str) -> Any:
         return None
 
 
+def _source_of(row: sqlite3.Row) -> Literal["proposer", "operator"]:
+    """The row's candidate source; anything but ``"operator"`` reads as the proposer."""
+    return "operator" if _row_value(row, "source") == "operator" else "proposer"
+
+
 def _cross_contract_settled_rows(db_path: Path, epoch_id: str) -> list[sqlite3.Row]:
     """Settled experiments from OTHER epochs sharing ``epoch_id``'s contract.
 
@@ -422,7 +427,7 @@ def _cross_contract_settled_rows(db_path: Path, epoch_id: str) -> list[sqlite3.R
         db_path,
         "SELECT e.epoch_id, e.generation_id, e.hypothesis_core_idea, "
         "e.hypothesis_json, e.tournament_decision, e.rejection_reason, "
-        "e.scalar_score_delta, e.outcome_json FROM experiments AS e "
+        "e.scalar_score_delta, e.outcome_json, e.source FROM experiments AS e "
         "JOIN epochs AS ep ON ep.epoch_id = e.epoch_id "
         "WHERE ep.contract_hash != '' "
         "AND ep.contract_hash = ("
@@ -466,6 +471,7 @@ def _cross_contract_entries(db_path: Path, epoch_id: str, budget: int) -> list[P
             scalar_score_delta=None,
             same_contract=False,
             prediction_accuracy=None,
+            source=_source_of(row),
         )
         if decision == "promoted":
             promoted.append(entry)
@@ -553,6 +559,7 @@ def prior_experiments_for_epoch(
             scalar_score_delta=None if delta is None else float(delta),
             same_contract=True,
             prediction_accuracy=_prediction_accuracy_for_row(row, ranges),
+            source=_source_of(row),
         )
         if decision == "promoted":
             promoted.append(entry)

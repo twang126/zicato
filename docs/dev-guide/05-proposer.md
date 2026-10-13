@@ -2501,9 +2501,15 @@ id any more, and the item runs again.
 > operator candidate still spends one Ladder holdout query, because it goes
 > through `confirm_crowning_holdout`.
 
-Not built yet: index columns and dashboard markers for the source and the
-author (the index `experiments` table has no source column), and a source
-field on `PriorExperiment`.
+**Where the source shows.** The index `experiments` table has `source` and
+`author` columns (ANALYTICAL-INDEX.md §3.3). `PriorExperiment.source` marks an
+operator's entry in experiment memory with `source:operator`, and that
+entry carries no `prediction:` band, because the band grades the proposer's
+own predictions. On the dashboard, the candidate card shows one faint
+caption line (author, edited generation, reverted points), the experiments
+ledger shows a faint caption under an operator row's idea, and the epoch
+header counts the operator candidates (`operator_candidate_count`, served by
+`build_epoch_view`). Each new field is folded into its view's digest (G10).
 
 ---
 

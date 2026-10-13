@@ -579,6 +579,8 @@ def build_epoch_view(
       the gross number sums every experiment and is the wrong headline
       for framing meta-loop direction. Either field is ``None`` when
       no experiment of the relevant kind carries a finite delta.
+    * ``operator_candidate_count`` — how many experiments carry an
+      ``operator`` provenance (queued by ``zicato proposer submit``).
     * ``journal`` — ``journal.md`` text (empty string when absent).
     * ``analysis_md`` — ``analysis.md`` text (empty string when absent).
     * ``analysis_html_available`` — ``True`` when ``analysis.html``
@@ -714,6 +716,12 @@ def build_epoch_view(
     # challengers, which never enter the lineage).
     view["delta_scalar_summary"] = compute_epoch_delta_summary(
         view["experiments"], champion_history(paths, epoch_id)
+    )
+    # How many of the epoch's candidates an operator submitted
+    # (``zicato proposer submit``), so the header can show how many tries
+    # came from outside the proposer.
+    view["operator_candidate_count"] = sum(
+        1 for record in view["experiments"] if isinstance(record.get("operator"), dict)
     )
 
     # Journal: epoch-level markdown log of hypothesis+outcome rounds.

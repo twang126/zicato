@@ -187,6 +187,10 @@ class PriorExperiment:
         section (banded, like the rest of the restricted memory); it NEVER
         gates promotion. See ``docs/design/FUNCTIONALITY-RECOMMENDATIONS.md``
         §4.2 and :func:`zicato.tournament.detail.hypothesis_ledger`.
+    source:
+        ``"operator"`` for a candidate that ``zicato proposer submit``
+        queued, else ``"proposer"``. The memory section marks an operator
+        entry, so the proposer can tell its own history from an operator's.
     """
 
     generation_id: str
@@ -198,6 +202,7 @@ class PriorExperiment:
     scalar_score_delta: float | None
     same_contract: bool = True
     prediction_accuracy: float | None = None
+    source: Literal["proposer", "operator"] = "proposer"
 
 
 @dataclass(frozen=True, slots=True)

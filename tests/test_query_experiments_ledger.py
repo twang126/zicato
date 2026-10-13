@@ -173,6 +173,8 @@ def test_ledger_row_shape_and_join(tmp_path: Path) -> None:
         "scalar_score_delta",
         "drift_loss_delta",
         "pass_rate_delta",
+        "source",
+        "author",
     }
 
     v2 = rows["v2"]

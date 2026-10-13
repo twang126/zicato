@@ -247,6 +247,8 @@ export async function render(host, ctx, params) {
     ? ep.delta_scalar_summary : null;
   const spineDelta = deltaSummary && svg.isNum(deltaSummary.champion_spine) ? deltaSummary.champion_spine : null;
   const grossDelta = deltaSummary && svg.isNum(deltaSummary.gross) ? deltaSummary.gross : null;
+  // How many candidates an operator submitted, counted by the server.
+  const operatorCount = (ep && Number.isInteger(ep.operator_candidate_count)) ? ep.operator_candidate_count : 0;
 
   const digest = JSON.stringify({
     epochId, goal: ep.goal || '', objective: objectiveText(ep), briefLen: (ep.brief || '').length, closed: !!ep.closed,
@@ -258,6 +260,7 @@ export async function render(host, ctx, params) {
       spineDelta == null ? null : spineDelta.toFixed(3),
       grossDelta == null ? null : grossDelta.toFixed(3),
     ],
+    operatorCount,
     structure: tournament ? [tournament.structure, JSON.stringify(tournament.params || {})] : null,
     nonGauntlet,
     racingFunnel: racingFunnel ? structureDigest(racingFunnel.st) : null,
@@ -304,6 +307,8 @@ export async function render(host, ctx, params) {
     nodes.push(el('div', { class: 'dn-panel dn-row', style: 'margin-top:12px;' }, [
       stat(String(board.length), 'board entries'),
       stat(String(experiments.length), 'experiments'),
+      // shown only when an operator submitted a candidate this epoch.
+      operatorCount ? stat(String(operatorCount), 'from an operator') : null,
       stat(String(promotedCount), 'promoted'),
       stat(ep.closed ? 'closed' : 'open', 'state'),
       // ── the Δscalar AGGREGATES the payload computes for this header ──
@@ -313,7 +318,7 @@ export async function render(host, ctx, params) {
       // so it is never mistaken for the headline.
       stat(spineDelta == null ? '—' : svg.fmtSigned(spineDelta, 2), 'Δ scalar · champion spine'),
       stat(grossDelta == null ? '—' : svg.fmtSigned(grossDelta, 2), 'Δ scalar · gross (all experiments)'),
-    ]));
+    ].filter(Boolean)));
     nodes.push(el('p', { class: 'dn-faint', style: 'font-size:11px;margin:6px 0 0;',
       text: 'Δ scalar sums the per-experiment scalar_score_delta · the champion-spine sum counts PROMOTED hops only — the meta-loop’s actual progress · the gross sum includes rejected challengers and never enters the lineage (lower = better)' }));
 

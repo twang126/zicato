@@ -934,7 +934,7 @@ with the route's degraded shape rather than a `500`.
 | `GET /api/epoch/{epoch_id}/cost` | Wall-clock and run-count cost accounting. |
 | `GET /api/epoch/{epoch_id}/racing-field` | The settled racing-field ladder; `present: false` on an epoch with no racing records. |
 | `GET /api/epoch/{epoch_id}/round-timeline` | The settled round timeline and loss-floor waterfall along the champion spine. |
-| `GET /api/epoch/{epoch_id}/experiments-ledger` | One row per experiment: idea, sites touched, verdict, delta. |
+| `GET /api/epoch/{epoch_id}/experiments-ledger` | One row per experiment: idea, sites touched, verdict, delta, and its `source` (`proposer` / `operator`) with the operator's `author`. |
 | `GET /api/epoch/{epoch_id}/evals` | The entries × candidates outcomes matrix ([EVAL-VIEW.md](EVAL-VIEW.md)). |
 | `GET /api/epoch/{epoch_id}/eval/{entry_id}` | One board entry's instrument-quality dossier. |
 | `GET /api/epoch/{epoch_id}/eval-health` | The instrument-quality panel. |
